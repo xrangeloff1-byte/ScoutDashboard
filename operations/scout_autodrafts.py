@@ -106,7 +106,9 @@ def main():
               "contact_source":source,"score":row.get("priority_score",""),
               "status":"NO_PUBLIC_SAME_DOMAIN_EMAIL" if not address else "REVIEW_REQUIRED",
               "gmail_draft_id":""}
-        if address and address.lower() in previous:\n            item['status']='EXISTING_GMAIL_DRAFT_SKIPPED'\n        elif address and int(row.get("priority_score") or 0)>=25 and made<MAX_DRAFTS:
+        if address and address.lower() in previous:
+            item['status']='EXISTING_GMAIL_DRAFT_SKIPPED'
+        elif address and int(row.get("priority_score") or 0)>=25 and made<MAX_DRAFTS:
             if token:
                 subject,body=make_message(row)
                 try:
