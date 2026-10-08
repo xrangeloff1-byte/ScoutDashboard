@@ -23,4 +23,28 @@ button.addEventListener('click',async()=>{
  }catch(e){statusEl.textContent='Notification test failed: '+e.message}
 });
 if('serviceWorker' in navigator)navigator.serviceWorker.register('./sw.js').then(checkAlerts).catch(e=>{statusEl.textContent='Service worker setup failed: '+e.message});else checkAlerts();
+
+// Web Push signup is separate from the local notification test.
+const pushState=document.getElementById('pushState');
+const pushButton=document.createElement('button');
+pushButton.type='button';pushButton.textContent='CONNECT LEAD ALERTS';
+pushButton.style.cssText='padding:14px 18px;border:0;border-radius:12px;font-weight:800;background:#75d987;color:#0b120d;margin-top:10px';
+pushState.parentNode.appendChild(pushButton);
+const b64ToBytes=base64=>Uint8Array.from(atob(base64.replace(/-/g,'+').replace(/_/g,'/')),c=>c.charCodeAt(0));
+const vapid=localStorage.getItem('scoutVapidPublicKey')||'';
+const endpoint=localStorage.getItem('scoutSubscriptionEndpoint')||'';
+pushState.textContent=vapid&&endpoint?'Ready to register this device for lead alerts.':'Background lead alerts require a configured push service. The test notification works locally.';
+pushButton.addEventListener('click',async()=>{
+ if(!('serviceWorker' in navigator)||!('PushManager' in window)){pushState.textContent='Background push is unsupported in this browser.';return}
+ if(!vapid||!endpoint){pushState.textContent='A push server is not configured yet. Local notifications are working, but background delivery needs server setup.';return}
+ try{
+  const reg=await navigator.serviceWorker.ready;
+  const subscription=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64ToBytes(vapid)});
+  const url=new URL(endpoint,location.href);
+  if(url.protocol!=='https:')throw Error('Push subscription requires HTTPS');
+  const response=await fetch(url.href,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(subscription)});
+  if(!response.ok)throw Error('Subscription server returned '+response.status);
+  pushState.textContent='Lead push alerts are connected on this device.';
+ }catch(error){pushState.textContent='Lead push setup failed: '+error.message}
+});
 </script></body></html>
