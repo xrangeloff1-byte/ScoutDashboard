@@ -1,0 +1,33 @@
+name: Scout Outreach Review
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '20 14 * * *'
+permissions:
+  contents: read
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Research prospects
+        env:
+          SERPER_API_KEY: ${{ secrets.SERPER_API_KEY }}
+        run: python operations/scout_prospect.py
+      - name: Prepare five offline drafts
+        run: python operations/scout_outreach_review.py
+      - name: Upload review files
+        uses: actions/upload-artifact@v4
+        with:
+          name: scout-outreach-review
+          path: |
+            operations/prospects.csv
+            operations/prospect_report.md
+            operations/outreach_review.csv
+            operations/outreach_report.md
+          retention-days: 30
+          if-no-files-found: error
