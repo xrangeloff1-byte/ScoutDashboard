@@ -1,13 +1,13 @@
 business,website,contact_method,contact_destination,contact_verified,outreach_status,reply_status,quote_usd,deal_status,revenue_usd,last_action,notes
 Royalty Roofing,https://royaltyroofing.org,email,info@royaltyroofing.org,public_address_previous_research,SENT,NO_REPLY_CONFIRMED,,NOT_CLOSED,0,2026-10-07,Initial email sent via Cairnflow Gmail
 Perficut,https://perficut.com,email,helpdesk@perficut.com,public_address_previous_research,SENT,NO_REPLY_CONFIRMED,,NOT_CLOSED,0,2026-10-07,Initial email sent via Cairnflow Gmail
-Premier Systems Roofing,https://premiersystemsroofing.com,unverified,,NO,DRAFT_INTERNAL,NOT_CONTACTED,,NOT_CLOSED,0,,Recipient needed
-Murray Custom Homes,https://murraycustomhomes.com,unverified,,NO,DRAFT_INTERNAL,NOT_CONTACTED,,NOT_CLOSED,0,,Recipient needed
-Action Plumbing Heating AC Electrical,https://actionlincoln.com,unverified,,NO,DRAFT_INTERNAL,NOT_CONTACTED,,NOT_CLOSED,0,,Recipient needed
-Phoenix Restoration,https://phoenixndr.com,unverified,,NO,DRAFT_INTERNAL,NOT_CONTACTED,,NOT_CLOSED,0,,Recipient needed
-Standard Heating and Air,https://standardac.com,unverified,,NO,DRAFT_INTERNAL,NOT_CONTACTED,,NOT_CLOSED,0,,Recipient needed
-Marick Mechanical,https://marickmechanical.com,unverified,,NO,DRAFT_INTERNAL,NOT_CONTACTED,,NOT_CLOSED,0,,Recipient needed
-Home Builders Association of Lincoln,https://hbal.org,unverified,,NO,DRAFT_INTERNAL,NOT_CONTACTED,,NOT_CLOSED,0,,Association may not be ideal buyer
-DreamMaker Bath and Kitchen Omaha,https://dreammaker-remodel.com,unverified,,NO,DRAFT_INTERNAL,NOT_CONTACTED,,NOT_CLOSED,0,,Recipient needed
-American Water Damage Omaha,https://americanwaterdamage.com,unverified,,NO,DRAFT_INTERNAL,NOT_CONTACTED,,NOT_CLOSED,0,,Recipient needed
-Above and Beyond CGM,https://aboveandbeyondcgm.com,unverified,,NO,DRAFT_INTERNAL,NOT_CONTACTED,,NOT_CLOSED,0,,Recipient needed
+Premier Systems Roofing,https://premiersystemsroofing.com,unverified,,NO,BLOCKED_UNVERIFIED_RECIPIENT,NOT_CONTACTED,,NOT_CLOSED,0,,Recipient unverified; batch send blocked; internal Gmail draft retained
+Murray Custom Homes,https://murraycustomhomes.com,unverified,,NO,BLOCKED_UNVERIFIED_RECIPIENT,NOT_CONTACTED,,NOT_CLOSED,0,,Recipient unverified; batch send blocked; internal Gmail draft retained
+Action Plumbing Heating AC Electrical,https://actionlincoln.com,unverified,,NO,BLOCKED_UNVERIFIED_RECIPIENT,NOT_CONTACTED,,NOT_CLOSED,0,,Recipient unverified; batch send blocked; internal Gmail draft retained
+Phoenix Restoration,https://phoenixndr.com,unverified,,NO,BLOCKED_UNVERIFIED_RECIPIENT,NOT_CONTACTED,,NOT_CLOSED,0,,Recipient unverified; batch send blocked; internal Gmail draft retained
+Standard Heating and Air,https://standardac.com,unverified,,NO,BLOCKED_UNVERIFIED_RECIPIENT,NOT_CONTACTED,,NOT_CLOSED,0,,Recipient unverified; batch send blocked; internal Gmail draft retained
+Marick Mechanical,https://marickmechanical.com,unverified,,NO,BLOCKED_UNVERIFIED_RECIPIENT,NOT_CONTACTED,,NOT_CLOSED,0,,Recipient unverified; batch send blocked; internal Gmail draft retained
+Home Builders Association of Lincoln,https://hbal.org,unverified,,NO,BLOCKED_UNVERIFIED_RECIPIENT,NOT_CONTACTED,,NOT_CLOSED,0,,Association may not be ideal buyer
+DreamMaker Bath and Kitchen Omaha,https://dreammaker-remodel.com,unverified,,NO,BLOCKED_UNVERIFIED_RECIPIENT,NOT_CONTACTED,,NOT_CLOSED,0,,Recipient unverified; batch send blocked; internal Gmail draft retained
+American Water Damage Omaha,https://americanwaterdamage.com,unverified,,NO,BLOCKED_UNVERIFIED_RECIPIENT,NOT_CONTACTED,,NOT_CLOSED,0,,Recipient unverified; batch send blocked; internal Gmail draft retained
+Above and Beyond CGM,https://aboveandbeyondcgm.com,unverified,,NO,BLOCKED_UNVERIFIED_RECIPIENT,NOT_CONTACTED,,NOT_CLOSED,0,,Recipient unverified; batch send blocked; internal Gmail draft retained
