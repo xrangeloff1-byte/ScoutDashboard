@@ -1,0 +1,45 @@
+name: Scout Automatic Draft Preparation
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '30 15 * * 1-5'
+permissions:
+  contents: read
+concurrency:
+  group: scout-autodrafts
+  cancel-in-progress: false
+jobs:
+  draft:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Discover businesses
+        env:
+          SERPER_API_KEY: ${{ secrets.SERPER_API_KEY }}
+        run: python operations/scout_prospect.py
+      - name: Qualify websites
+        run: python operations/scout_qualify.py
+      - name: Find public contacts and prepare Gmail drafts if OAuth is configured
+        env:
+          GMAIL_CLIENT_ID: ${{ secrets.GMAIL_CLIENT_ID }}
+          GMAIL_CLIENT_SECRET: ${{ secrets.GMAIL_CLIENT_SECRET }}
+          GMAIL_REFRESH_TOKEN: ${{ secrets.GMAIL_REFRESH_TOKEN }}
+          SCOUT_SENDER_NAME: ${{ vars.SCOUT_SENDER_NAME }}
+          SCOUT_BUSINESS_CONTACT: ${{ vars.SCOUT_BUSINESS_CONTACT }}
+          SCOUT_MAX_DRAFTS: '5'
+        run: python operations/scout_autodrafts.py
+      - name: Upload review package
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scout-autodrafts-review
+          path: |
+            operations/draft_review.csv
+            operations/draft_review.md
+            operations/outreach_drafts.md
+            operations/qualification_report.md
+          retention-days: 7
