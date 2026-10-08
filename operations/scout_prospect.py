@@ -28,7 +28,9 @@ QUERIES = [
     "Lincoln NE custom home builder remodeling contractor website",
 ]
 BLOCKED = {"facebook.com", "instagram.com", "yelp.com", "angi.com", "bbb.org",
-           "yellowpages.com", "linkedin.com", "mapquest.com", "homeadvisor.com"}
+           "yellowpages.com", "linkedin.com", "mapquest.com", "homeadvisor.com",
+           "houzz.com", "thumbtack.com", "chamberofcommerce.com", "porch.com",
+           "buildzoom.com", "expertise.com", "threebestrated.com"}
 
 def domain(url):
     host = (urlparse(url).hostname or "").lower()
