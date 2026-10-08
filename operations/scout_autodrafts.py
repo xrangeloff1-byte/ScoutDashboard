@@ -9,9 +9,13 @@ REPORT=ROOT/"draft_review.md"
 MAX_DRAFTS=min(max(int(os.getenv("SCOUT_MAX_DRAFTS","5")),0),10)
 class Contacts(HTMLParser):
     def __init__(self):
-        super().__init__(); self.emails=[]; self.links=[]; self.phones=[]; self.forms=0
+        super().__init__(); self.emails=[]; self.links=[]; self.phones=[]; self.forms=0; self.form_fields=set()
     def handle_starttag(self,tag,attrs):
         if tag=="form": self.forms+=1
+        if tag in ("input","textarea"):
+            a=dict(attrs)
+            if tag=="textarea" or a.get("type","").lower()=="email" or any(x in a.get("name","").lower() for x in ("message","email","inquiry","comment")):
+                self.form_fields.add(tag+":"+a.get("name",""))
         if tag!="a": return
         href=dict(attrs).get("href","")
         if href.lower().startswith("tel:"):
@@ -33,7 +37,7 @@ def find_contact(domain):
     try:
         origin="https://"+domain+"/"
         home=Contacts();home.feed(fetch(origin))
-        pages=[("public_homepage_mailto",home)]
+        pages=[("public_homepage_mailto",origin,home)]
         checked=set()
         for link in home.links:
             url=urllib.parse.urljoin(origin,link)
@@ -42,12 +46,12 @@ def find_contact(domain):
             if len(checked)>=2: break
             checked.add(url)
             try:
-                p=Contacts();p.feed(fetch(url));pages.append(("public_contact_page_mailto",p))
+                p=Contacts();p.feed(fetch(url));pages.append(("public_contact_page_mailto",url,p))
             except Exception: pass
         fallback_form=""
         fallback_phone=""
-        for source,parser in pages:
-            if parser.forms and not fallback_form: fallback_form=origin if source=="public_homepage_mailto" else next((u for u in checked if "contact" in u.lower()),origin)
+        for source,page_url,parser in pages:
+            if parser.forms and parser.form_fields and not fallback_form: fallback_form=page_url
             if parser.phones and not fallback_phone: fallback_phone=parser.phones[0]
             for address in parser.emails:
                 address=address.strip()
@@ -138,13 +142,16 @@ def main():
                     item["status"]="GMAIL_DRAFT_CREATED_UNSENT";made+=1;previous.add(address.lower())
                 except Exception as e: item["status"]="GMAIL_ERROR_"+type(e).__name__
             else: item["status"]="AWAITING_GMAIL_OAUTH_AND_SENDER_DETAILS"
+        if form_url and not address:
+            item["form_message"]=make_message(row)[1] if all(os.getenv(k) for k in ("SCOUT_SENDER_NAME","SCOUT_BUSINESS_CONTACT")) else ""
+        else: item["form_message"]=""
         result.append(item)
     with OUT.open("w",newline="",encoding="utf-8") as f:
-        w=csv.DictWriter(f,fieldnames=["business","domain","email","contact_source","contact_form","business_phone","score","status","gmail_draft_id"]);w.writeheader();w.writerows(result)
+        w=csv.DictWriter(f,fieldnames=["business","domain","email","contact_source","contact_form","business_phone","form_message","score","status","gmail_draft_id"]);w.writeheader();w.writerows(result)
     REPORT.write_text("# Scout Gmail draft review\n\n"
         +f"Businesses reviewed: {len(result)}\nDrafts created (unsent): {made}\nEmails sent: 0\n"
         +f"Gmail OAuth and sender details configured: {configured}\n\n"
-        +"Contact research checks published same-domain email links, contact forms, and telephone links on public pages. "
+        +"Contact research checks published same-domain email links, forms with message/email fields, and telephone links on public pages. Form links are review-only; no forms are submitted. "
         +"These addresses and the proposed messages require manual verification before sending. "
         +"Do not use automated sending without separate authorization and compliance checks.\n",encoding="utf-8")
     print(f"Scout autodrafts: {len(result)} businesses, {sum(bool(x['email']) for x in result)} public contacts, {made} Gmail drafts, 0 sent")
