@@ -90,7 +90,13 @@ def main():
     if configured:
         try: token=refresh_token()
         except Exception as e: print("Gmail OAuth unavailable:",type(e).__name__)
-    previous=set()\n    if token:\n        try: previous=existing_draft_recipients(token)\n        except Exception as e:\n            print('Cannot verify existing Gmail drafts; refusing to create duplicates:',type(e).__name__)\n            token=''\n    result=[];made=0;used=set()
+    previous=set()
+    if token:
+        try: previous=existing_draft_recipients(token)
+        except Exception as e:
+            print('Cannot verify existing Gmail drafts; refusing to create duplicates:',type(e).__name__)
+            token=''
+    result=[];made=0;used=set()
     for row in rows:
         domain=row.get("domain","").strip().lower()
         if not domain or domain in used: continue
