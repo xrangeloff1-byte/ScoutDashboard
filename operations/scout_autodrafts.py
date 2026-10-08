@@ -24,13 +24,28 @@ def fetch(url):
         if "text/html" not in res.headers.get("Content-Type","").lower(): return ""
         return res.read(160000).decode("utf-8","replace")
 def find_contact(domain):
-    # Only public mailto links on the same business homepage; no scraping hidden data.
+    # Review only explicitly published business mailto links on the homepage
+    # and at most two same-domain contact/about pages. Never infer an address.
     if not re.fullmatch(r"[a-z0-9.-]+",domain,re.I): return "", "invalid_domain"
     try:
-        parser=Contacts();parser.feed(fetch("https://"+domain+"/"))
-        for address in parser.emails:
-            if re.fullmatch(r"[^\s@<>]+@[^\s@<>]+\.[a-z]{2,}",address,re.I) and address.lower().split("@")[1]==domain.lower():
-                return address,"public_homepage_mailto"
+        origin="https://"+domain+"/"
+        home=Contacts();home.feed(fetch(origin))
+        pages=[("public_homepage_mailto",home)]
+        checked=set()
+        for link in home.links:
+            url=urllib.parse.urljoin(origin,link)
+            parsed=urllib.parse.urlparse(url)
+            if parsed.scheme!="https" or parsed.hostname!=domain or url in checked: continue
+            if len(checked)>=2: break
+            checked.add(url)
+            try:
+                p=Contacts();p.feed(fetch(url));pages.append(("public_contact_page_mailto",p))
+            except Exception: pass
+        for source,parser in pages:
+            for address in parser.emails:
+                address=address.strip()
+                if re.fullmatch(r"[^\\s@<>]+@[^\\s@<>]+\\.[a-z]{2,}",address,re.I) and address.lower().split("@")[1]==domain.lower():
+                    return address,source
         return "","no_same_domain_public_mailto"
     except Exception as e: return "","lookup_"+type(e).__name__
 def make_message(row):
