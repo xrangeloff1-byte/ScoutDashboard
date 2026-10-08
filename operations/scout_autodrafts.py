@@ -51,7 +51,9 @@ def find_contact(domain):
         fallback_form=""
         fallback_phone=""
         for source,page_url,parser in pages:
-            if parser.forms and parser.form_fields and not fallback_form: fallback_form=page_url
+            if (parser.forms and parser.form_fields and not fallback_form
+                and not any(word in urllib.parse.urlparse(page_url).path.lower() for word in ("/career","/jobs","/employment","/apply"))):
+                fallback_form=page_url
             if parser.phones and not fallback_phone: fallback_phone=parser.phones[0]
             for address in parser.emails:
                 address=address.strip()
@@ -126,6 +128,7 @@ def main():
     for row in rows:
         domain=row.get("domain","").strip().lower()
         if not domain or domain in used: continue
+        if domain in ("app.sublynk.com",) or domain.startswith("app."): continue
         used.add(domain)
         address,source,form_url,phone=find_contact(domain)
         item={"business":row.get("business",""),"domain":domain,"email":address,
