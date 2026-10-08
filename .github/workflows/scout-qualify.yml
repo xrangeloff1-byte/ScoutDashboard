@@ -1,0 +1,32 @@
+name: Scout Research and Qualify
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Discover public business candidates
+        env:
+          SERPER_API_KEY: ${{ secrets.SERPER_API_KEY }}
+        run: python operations/scout_prospect.py
+      - name: Inspect, score and prepare review-only drafts
+        run: python operations/scout_qualify.py
+      - name: Upload private-to-run review package
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scout-qualified-review
+          path: |
+            operations/prospects.csv
+            operations/qualified_leads.csv
+            operations/outreach_drafts.md
+            operations/qualification_report.md
+            operations/prospect_report.md
+          retention-days: 14
