@@ -13,11 +13,19 @@ from urllib.parse import urlparse
 ROOT = pathlib.Path(__file__).resolve().parent
 OUT = ROOT / "prospects.csv"
 REPORT = ROOT / "prospect_report.md"
+# Focus on businesses where one qualified inquiry may justify a paid website project.
+# Search results are leads for human review, not proof of budget or website defects.
 QUERIES = [
-    "Omaha Nebraska independent roofing contractor website",
-    "Omaha Nebraska independent landscaping business website",
-    "Omaha Nebraska local plumbing company website",
-    "Lincoln Nebraska small HVAC contractor website",
+    "Omaha NE commercial roofing contractor company website",
+    "Omaha NE commercial HVAC mechanical contractor website",
+    "Omaha NE water damage restoration company website",
+    "Omaha NE kitchen bathroom remodeling contractor website",
+    "Lincoln NE commercial plumbing contractor company website",
+    "Lincoln NE HVAC installation contractor company website",
+    "Lincoln NE roofing restoration contractor website",
+    "Omaha NE concrete foundation repair contractor website",
+    "Omaha NE commercial landscaping contractor website",
+    "Lincoln NE custom home builder remodeling contractor website",
 ]
 BLOCKED = {"facebook.com", "instagram.com", "yelp.com", "angi.com", "bbb.org",
            "yellowpages.com", "linkedin.com", "mapquest.com", "homeadvisor.com"}
