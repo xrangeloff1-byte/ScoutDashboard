@@ -2,12 +2,12 @@ business,website,contact_method,contact_destination,contact_verified,outreach_st
 Royalty Roofing,https://royaltyroofing.org,email,info@royaltyroofing.org,public_address_previous_research,SENT,NO_REPLY_CONFIRMED,,NOT_CLOSED,0,2026-10-07,Initial email sent via Cairnflow Gmail
 Perficut,https://perficut.com,email,helpdesk@perficut.com,public_address_previous_research,SENT,NO_REPLY_CONFIRMED,,NOT_CLOSED,0,2026-10-07,Initial email sent via Cairnflow Gmail
 Premier Systems Roofing,https://premiersystemsroofing.com,unverified,,NO,BLOCKED_UNVERIFIED_RECIPIENT,NOT_CONTACTED,,NOT_CLOSED,0,,Recipient unverified; batch send blocked; internal Gmail draft retained
-Murray Custom Homes,https://murraycustomhomes.com,unverified,,NO,BLOCKED_UNVERIFIED_RECIPIENT,NOT_CONTACTED,,NOT_CLOSED,0,,Recipient unverified; batch send blocked; internal Gmail draft retained
+Murray Custom Homes,https://murraycustomhomes.com,email,info@murraycustomhomes.com,public_website_contact,READY_DRAFT_NOT_SENT,NOT_CONTACTED,,NOT_CLOSED,0,,Public contact located; Gmail draft addressed; not sent
 Action Plumbing Heating AC Electrical,https://actionlincoln.com,unverified,,NO,BLOCKED_UNVERIFIED_RECIPIENT,NOT_CONTACTED,,NOT_CLOSED,0,,Recipient unverified; batch send blocked; internal Gmail draft retained
-Phoenix Restoration,https://phoenixndr.com,unverified,,NO,BLOCKED_UNVERIFIED_RECIPIENT,NOT_CONTACTED,,NOT_CLOSED,0,,Recipient unverified; batch send blocked; internal Gmail draft retained
+Phoenix Restoration,https://phoenixndr.com,email,omaha@phoenixndr.com,public_website_contact,READY_DRAFT_NOT_SENT,NOT_CONTACTED,,NOT_CLOSED,0,,Public contact located; Gmail draft addressed; not sent
 Standard Heating and Air,https://standardac.com,unverified,,NO,BLOCKED_UNVERIFIED_RECIPIENT,NOT_CONTACTED,,NOT_CLOSED,0,,Recipient unverified; batch send blocked; internal Gmail draft retained
 Marick Mechanical,https://marickmechanical.com,unverified,,NO,BLOCKED_UNVERIFIED_RECIPIENT,NOT_CONTACTED,,NOT_CLOSED,0,,Recipient unverified; batch send blocked; internal Gmail draft retained
-Home Builders Association of Lincoln,https://hbal.org,unverified,,NO,BLOCKED_UNVERIFIED_RECIPIENT,NOT_CONTACTED,,NOT_CLOSED,0,,Association may not be ideal buyer
-DreamMaker Bath and Kitchen Omaha,https://dreammaker-remodel.com,unverified,,NO,BLOCKED_UNVERIFIED_RECIPIENT,NOT_CONTACTED,,NOT_CLOSED,0,,Recipient unverified; batch send blocked; internal Gmail draft retained
+Home Builders Association of Lincoln,https://hbal.org,email,info@hbal.org,public_website_contact,READY_DRAFT_NOT_SENT,NOT_CONTACTED,,NOT_CLOSED,0,,Public contact located; Gmail draft addressed; not sent
+DreamMaker Bath and Kitchen Omaha,https://dreammaker-remodel.com,email,jamie.noltner@dmbkomaha.com,public_website_contact,READY_DRAFT_NOT_SENT,NOT_CONTACTED,,NOT_CLOSED,0,,Public contact located; Gmail draft addressed; not sent
 American Water Damage Omaha,https://americanwaterdamage.com,unverified,,NO,BLOCKED_UNVERIFIED_RECIPIENT,NOT_CONTACTED,,NOT_CLOSED,0,,Recipient unverified; batch send blocked; internal Gmail draft retained
 Above and Beyond CGM,https://aboveandbeyondcgm.com,unverified,,NO,BLOCKED_UNVERIFIED_RECIPIENT,NOT_CONTACTED,,NOT_CLOSED,0,,Recipient unverified; batch send blocked; internal Gmail draft retained
