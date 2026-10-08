@@ -9,10 +9,13 @@ REPORT=ROOT/"draft_review.md"
 MAX_DRAFTS=min(max(int(os.getenv("SCOUT_MAX_DRAFTS","5")),0),10)
 class Contacts(HTMLParser):
     def __init__(self):
-        super().__init__(); self.emails=[]; self.links=[]
+        super().__init__(); self.emails=[]; self.links=[]; self.phones=[]; self.forms=0
     def handle_starttag(self,tag,attrs):
+        if tag=="form": self.forms+=1
         if tag!="a": return
         href=dict(attrs).get("href","")
+        if href.lower().startswith("tel:"):
+            self.phones.append(urllib.parse.unquote(href[4:].split("?")[0]).strip())
         if href.lower().startswith("mailto:"):
             address=urllib.parse.unquote(href[7:].split("?")[0]).strip()
             self.emails.append(address)
@@ -26,7 +29,7 @@ def fetch(url):
 def find_contact(domain):
     # Review only explicitly published business mailto links on the homepage
     # and at most two same-domain contact/about pages. Never infer an address.
-    if not re.fullmatch(r"[a-z0-9.-]+",domain,re.I): return "", "invalid_domain"
+    if not re.fullmatch(r"[a-z0-9.-]+",domain,re.I): return "", "invalid_domain","",""
     try:
         origin="https://"+domain+"/"
         home=Contacts();home.feed(fetch(origin))
@@ -41,13 +44,17 @@ def find_contact(domain):
             try:
                 p=Contacts();p.feed(fetch(url));pages.append(("public_contact_page_mailto",p))
             except Exception: pass
+        fallback_form=""
+        fallback_phone=""
         for source,parser in pages:
+            if parser.forms and not fallback_form: fallback_form=origin if source=="public_homepage_mailto" else next((u for u in checked if "contact" in u.lower()),origin)
+            if parser.phones and not fallback_phone: fallback_phone=parser.phones[0]
             for address in parser.emails:
                 address=address.strip()
                 if re.fullmatch(r"[^\\s@<>]+@[^\\s@<>]+\\.[a-z]{2,}",address,re.I) and address.lower().split("@")[1]==domain.lower():
-                    return address,source
-        return "","no_same_domain_public_mailto"
-    except Exception as e: return "","lookup_"+type(e).__name__
+                    return address,source,fallback_form,fallback_phone
+        return "","no_same_domain_public_mailto",fallback_form,fallback_phone
+    except Exception as e: return "","lookup_"+type(e).__name__,"",""
 def make_message(row):
     name=(row.get("business") or row["domain"]).strip()
     subject="A quick website question for "+name
@@ -116,10 +123,10 @@ def main():
         domain=row.get("domain","").strip().lower()
         if not domain or domain in used: continue
         used.add(domain)
-        address,source=find_contact(domain)
+        address,source,form_url,phone=find_contact(domain)
         item={"business":row.get("business",""),"domain":domain,"email":address,
-              "contact_source":source,"score":row.get("priority_score",""),
-              "status":"NO_PUBLIC_SAME_DOMAIN_EMAIL" if not address else "REVIEW_REQUIRED",
+              "contact_source":source,"contact_form":form_url,"business_phone":phone,"score":row.get("priority_score",""),
+              "status":("REVIEW_REQUIRED" if address else "CONTACT_FORM_AVAILABLE" if form_url else "PHONE_AVAILABLE" if phone else "NO_VERIFIED_CONTACT"),
               "gmail_draft_id":""}
         if address and address.lower() in previous:
             item['status']='EXISTING_GMAIL_DRAFT_SKIPPED'
@@ -133,11 +140,11 @@ def main():
             else: item["status"]="AWAITING_GMAIL_OAUTH_AND_SENDER_DETAILS"
         result.append(item)
     with OUT.open("w",newline="",encoding="utf-8") as f:
-        w=csv.DictWriter(f,fieldnames=["business","domain","email","contact_source","score","status","gmail_draft_id"]);w.writeheader();w.writerows(result)
+        w=csv.DictWriter(f,fieldnames=["business","domain","email","contact_source","contact_form","business_phone","score","status","gmail_draft_id"]);w.writeheader();w.writerows(result)
     REPORT.write_text("# Scout Gmail draft review\n\n"
         +f"Businesses reviewed: {len(result)}\nDrafts created (unsent): {made}\nEmails sent: 0\n"
         +f"Gmail OAuth and sender details configured: {configured}\n\n"
-        +"Only same-domain mailto addresses found on public homepages are considered. "
+        +"Contact research checks published same-domain email links, contact forms, and telephone links on public pages. "
         +"These addresses and the proposed messages require manual verification before sending. "
         +"Do not use automated sending without separate authorization and compliance checks.\n",encoding="utf-8")
     print(f"Scout autodrafts: {len(result)} businesses, {sum(bool(x['email']) for x in result)} public contacts, {made} Gmail drafts, 0 sent")
