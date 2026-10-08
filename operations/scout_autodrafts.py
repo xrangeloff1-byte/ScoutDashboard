@@ -61,6 +61,27 @@ def refresh_token():
       "refresh_token":os.environ["GMAIL_REFRESH_TOKEN"],"grant_type":"refresh_token"}).encode()
     req=urllib.request.Request("https://oauth2.googleapis.com/token",data=data,method="POST")
     with urllib.request.urlopen(req,timeout=20) as res: return json.load(res)["access_token"]
+def existing_draft_recipients(token):
+    """Fail closed if Gmail draft history cannot be checked."""
+    recipients=set()
+    page=""
+    while True:
+        url="https://gmail.googleapis.com/gmail/v1/users/me/drafts?maxResults=100"
+        if page: url+="&pageToken="+urllib.parse.quote(page)
+        req=urllib.request.Request(url,headers={"Authorization":"Bearer "+token})
+        with urllib.request.urlopen(req,timeout=20) as res: data=json.load(res)
+        for draft in data.get("drafts",[]):
+            detail="https://gmail.googleapis.com/gmail/v1/users/me/drafts/"+urllib.parse.quote(draft["id"])+"?format=metadata"
+            req=urllib.request.Request(detail,headers={"Authorization":"Bearer "+token})
+            with urllib.request.urlopen(req,timeout=20) as res: info=json.load(res)
+            headers={h["name"].lower():h["value"] for h in info.get("message",{}).get("payload",{}).get("headers",[])}
+            if headers.get("subject","").startswith("A quick website question for "):
+                for address in re.findall(r"[A-Za-z0-9._%+\\-]+@[A-Za-z0-9.\\-]+\\.[A-Za-z]{2,}",headers.get("to","")):
+                    recipients.add(address.lower())
+        page=data.get("nextPageToken","")
+        if not page: break
+    return recipients
+
 def main():
     if not IN.exists(): raise SystemExit("Run qualification first")
     with IN.open(newline="",encoding="utf-8") as f: rows=list(csv.DictReader(f))
@@ -69,7 +90,7 @@ def main():
     if configured:
         try: token=refresh_token()
         except Exception as e: print("Gmail OAuth unavailable:",type(e).__name__)
-    result=[];made=0;used=set()
+    previous=set()\n    if token:\n        try: previous=existing_draft_recipients(token)\n        except Exception as e:\n            print('Cannot verify existing Gmail drafts; refusing to create duplicates:',type(e).__name__)\n            token=''\n    result=[];made=0;used=set()
     for row in rows:
         domain=row.get("domain","").strip().lower()
         if not domain or domain in used: continue
@@ -79,12 +100,12 @@ def main():
               "contact_source":source,"score":row.get("priority_score",""),
               "status":"NO_PUBLIC_SAME_DOMAIN_EMAIL" if not address else "REVIEW_REQUIRED",
               "gmail_draft_id":""}
-        if address and int(row.get("priority_score") or 0)>=25 and made<MAX_DRAFTS:
+        if address and address.lower() in previous:\n            item['status']='EXISTING_GMAIL_DRAFT_SKIPPED'\n        elif address and int(row.get("priority_score") or 0)>=25 and made<MAX_DRAFTS:
             if token:
                 subject,body=make_message(row)
                 try:
                     item["gmail_draft_id"]=gmail_draft(address,subject,body,token)
-                    item["status"]="GMAIL_DRAFT_CREATED_UNSENT";made+=1
+                    item["status"]="GMAIL_DRAFT_CREATED_UNSENT";made+=1;previous.add(address.lower())
                 except Exception as e: item["status"]="GMAIL_ERROR_"+type(e).__name__
             else: item["status"]="AWAITING_GMAIL_OAUTH_AND_SENDER_DETAILS"
         result.append(item)
