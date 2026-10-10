@@ -11,7 +11,18 @@ from urllib.parse import urljoin, urlparse
 
 ROOT = Path(__file__).resolve().parent
 FIELDS = ["business","website","contact_email","contact_source","name_source","opportunity","evidence_url","evidence","status","subject","draft"]
-AGENT = "ScoutResearch/2.0 (public business website review)"
+AGENT = "ScoutResearch/2.1 (public business website review)"
+BLOCKED = {"yelp.com","angi.com","bbb.org","houzz.com","facebook.com","linkedin.com","yellowpages.com","mapquest.com","homeadvisor.com","chamberofcommerce.com","buildzoom.com","thumbtack.com","porch.com","expertise.com","threebestrated.com"}
+GENERIC = {"home","homepage","welcome","contact us","about us","services","roofing","contractors","commercial roofing","roofing contractor"}
+def blocked(host):
+    return any(host == b or host.endswith("." + b) for b in BLOCKED)
+def usable_name(name, host):
+    n = clean_name(name)
+    low = n.casefold().strip(" .!")
+    if not n or low in GENERIC or len(n) < 4 or len(n) > 70: return False
+    if any(word in low for word in ("top 10", "best companies", "near me", "directory", "reviews", "find a contractor")): return False
+    return True
+
 class Page(HTMLParser):
     def __init__(self):
         super().__init__()
@@ -65,7 +76,7 @@ def inspect(lead):
     url = (lead.get("website") or "").strip()
     parsed = urlparse(url)
     host = (parsed.hostname or "").lower().removeprefix("www.")
-    if not host or parsed.scheme != "https": return None
+    if not host or parsed.scheme != "https" or blocked(host): return None
     home = "https://" + host + "/"
     try:
         page = fetch(home)
@@ -76,9 +87,13 @@ def inspect(lead):
                 "status":"MANUAL_VERIFICATION_REQUIRED","subject":"","draft":""}
     title = clean_name(" ".join(page.titles))
     h1 = clean_name(" ".join(page.headings))
-    name = title or h1
-    if not name: name = clean_name(lead.get("business"))
-    name_source = home if title or h1 else "Search result (unverified)"
+    name = next((n for n in (title, h1) if usable_name(n, host)), "")
+    name_source = home if name else ""
+    if not name:
+        return {"business":clean_name(lead.get("business")),"website":home,"contact_email":"",
+                "contact_source":"","name_source":"","opportunity":"Manual company verification",
+                "evidence_url":home,"evidence":"No reliable company name detected on homepage",
+                "status":"NAME_VERIFICATION_REQUIRED","subject":"","draft":""}
     contact = ""
     contact_source = ""
     for link in page.links:
@@ -126,19 +141,22 @@ def main():
     if not source.exists(): raise SystemExit("prospects.csv missing")
     with source.open(newline="",encoding="utf-8") as f: leads = list(csv.DictReader(f))
     rows, seen = [], set()
-    for lead in leads[:35]:
+    for lead in leads[:60]:
         host = (urlparse(lead.get("website") or "").hostname or "").lower().removeprefix("www.")
-        if not host or host in seen: continue
+        if not host or host in seen or blocked(host): continue
         seen.add(host)
         result = inspect(lead)
         if result: rows.append(result)
-        if sum(bool(r["draft"]) for r in rows) >= 5: break
-    selected = [r for r in rows if r["draft"]][:5]
+        if len(rows) >= 35: break
+    eligible = [r for r in rows if r["draft"]]
+    # Prefer verified public business contacts; preserve evidence and review-only status.
+    selected = sorted(eligible, key=lambda r: (not bool(r["contact_email"]), r["business"].casefold()))[:5]
     with (ROOT/"outreach_review.csv").open("w",newline="",encoding="utf-8") as f:
         writer = csv.DictWriter(f,fieldnames=FIELDS)
         writer.writeheader()
         writer.writerows(selected)
     ready = sum(bool(r["contact_email"]) for r in selected)
+    total_contacts = sum(bool(r["contact_email"]) for r in rows)
     (ROOT/"outreach_report.md").write_text(
         f"# Scout Evidence-Based Outreach Review\n\nProspects in source: {len(leads)}\n"
         f"Websites inspected: {len(rows)}\nOffline drafts prepared: {len(selected)}\n"
@@ -146,5 +164,5 @@ def main():
         "Names and email addresses come from inspected company pages where available. "
         "All findings are preliminary, require human review, and do not establish actual defects. "
         "No Gmail drafts or messages were created.\n",encoding="utf-8")
-    print(f"Scout: {len(rows)} websites inspected; {len(selected)} offline drafts; {ready} public emails; 0 sent")
+    print(f"Scout: {len(rows)} websites inspected; {len(selected)} offline drafts; {total_contacts} public emails ({ready} selected); 0 sent")
 if __name__ == "__main__": main()
