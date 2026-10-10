@@ -11,7 +11,13 @@ from urllib.parse import urljoin, urlparse
 
 ROOT = Path(__file__).resolve().parent
 FIELDS = ["business","website","contact_email","contact_source","name_source","opportunity","evidence_url","evidence","status","subject","draft"]
-AGENT = "ScoutResearch/2.1 (public business website review)"
+AGENT = "ScoutResearch/3.0 (public business website review)"
+NONCUSTOMERS = ("association","chamber of commerce","trade group","trade association","nonprofit","non-profit","directory","marketplace","business listing","find a contractor","best roofing","top roofing","national association")
+BUSINESS_TERMS = ("roof","hvac","heating","cooling","plumb","restor","remodel","construction","contract","landscap","concrete","builder","mechanical","foundation")
+def likely_customer(name, host):
+    low = (name + " " + host).lower()
+    return not any(x in low for x in NONCUSTOMERS) and any(x in low for x in BUSINESS_TERMS)
+
 BLOCKED = {"yelp.com","angi.com","bbb.org","houzz.com","facebook.com","linkedin.com","yellowpages.com","mapquest.com","homeadvisor.com","chamberofcommerce.com","buildzoom.com","thumbtack.com","porch.com","expertise.com","threebestrated.com"}
 GENERIC = {"home","homepage","welcome","contact us","about us","services","roofing","contractors","commercial roofing","roofing contractor"}
 def blocked(host):
@@ -32,9 +38,11 @@ class Page(HTMLParser):
         self.heading = False
         self.links = []
         self.text = []
+        self.forms = 0
     def handle_starttag(self, tag, attrs):
         d = dict(attrs)
         if tag == "title": self.title = True
+        if tag == "form": self.forms += 1
         if tag == "h1": self.heading = True
         if tag == "a" and d.get("href"): self.links.append(d["href"])
     def handle_endtag(self, tag):
@@ -87,7 +95,7 @@ def inspect(lead):
                 "status":"MANUAL_VERIFICATION_REQUIRED","subject":"","draft":""}
     title = clean_name(" ".join(page.titles))
     h1 = clean_name(" ".join(page.headings))
-    name = next((n for n in (title, h1) if usable_name(n, host)), "")
+    name = next((n for n in (h1, title) if usable_name(n, host) and likely_customer(n, host)), "")
     name_source = home if name else ""
     if not name:
         return {"business":clean_name(lead.get("business")),"website":home,"contact_email":"",
@@ -120,47 +128,55 @@ def inspect(lead):
             pass
     paths = [urlparse(x).path.lower() for x in page.links]
     has_contact = any("contact" in p or "quote" in p or "estimate" in p for p in paths)
-    if not has_contact:
-        opportunity = "Review visibility of inquiry options"
-        evidence = "No contact, quote, or estimate link detected in homepage anchor links; other inquiry options may exist."
+    if not has_contact and page.forms == 0:
+        opportunity = "Check visibility of quote and contact options"
+        evidence = "No homepage HTML form or contact/quote/estimate link was detected; other inquiry options may exist."
+        priority = 3
+    elif page.forms:
+        opportunity = "Review existing inquiry form for friction"
+        evidence = f"Homepage HTML contains {page.forms} form element(s); no usability test has been performed."
+        priority = 2
     else:
-        opportunity = "Review mobile inquiry experience"
-        evidence = "Homepage links include an inquiry-related path; mobile usability has not been tested."
+        opportunity = "Review existing contact and quote journey"
+        evidence = "Homepage links to contact, quote, or estimate information; its usability has not been tested."
+        priority = 1
     status = "HUMAN_REVIEW_REQUIRED" if contact and name_source != "Search result (unverified)" else "CONTACT_OR_NAME_REVIEW_REQUIRED"
-    subject = f"An optional website inquiry review for {name[:55]}"
+    subject = f"Question about {name[:55]} website inquiries"
     draft = (f"Hello {name} team,\n\nI was looking at your website ({home}) and noticed "
-             f"an opportunity worth reviewing: {opportunity.lower()}. "
+             f"this observable detail: {evidence} "
              "I haven't completed a usability audit, so I wouldn't want to assume anything is broken. "
-             "Would you be open to a short, no-obligation review with specific findings and practical recommendations? "
+             "Would you be open to a short, no-cost review with practical recommendations? "
              "If it isn't useful, there's no obligation.\n\nBest,\nScout")
     return {"business":name,"website":home,"contact_email":contact,"contact_source":contact_source,
             "name_source":name_source,"opportunity":opportunity,"evidence_url":home,
-            "evidence":evidence,"status":status,"subject":subject,"draft":draft}
+            "evidence":evidence,"status":status,"subject":subject,"draft":draft,"_priority":priority}
 def main():
     source = ROOT/"prospects.csv"
     if not source.exists(): raise SystemExit("prospects.csv missing")
     with source.open(newline="",encoding="utf-8") as f: leads = list(csv.DictReader(f))
     rows, seen = [], set()
-    for lead in leads[:60]:
+    for lead in leads[:80]:
         host = (urlparse(lead.get("website") or "").hostname or "").lower().removeprefix("www.")
-        if not host or host in seen or blocked(host): continue
+        if not host or host in seen or blocked(host) or not likely_customer(lead.get("business", ""), host): continue
         seen.add(host)
         result = inspect(lead)
         if result: rows.append(result)
         if len(rows) >= 35: break
     eligible = [r for r in rows if r["draft"]]
     # Prefer verified public business contacts; preserve evidence and review-only status.
-    selected = sorted(eligible, key=lambda r: (not bool(r["contact_email"]), r["business"].casefold()))[:5]
+    selected = sorted(eligible, key=lambda r: (not bool(r["contact_email"]), -r.get("_priority", 0), r["business"].casefold()))[:5]
+    selected = [{k: v for k, v in row.items() if k in FIELDS} for row in selected]
     with (ROOT/"outreach_review.csv").open("w",newline="",encoding="utf-8") as f:
         writer = csv.DictWriter(f,fieldnames=FIELDS)
         writer.writeheader()
         writer.writerows(selected)
     ready = sum(bool(r["contact_email"]) for r in selected)
     total_contacts = sum(bool(r["contact_email"]) for r in rows)
+    manual_review = len(rows) - len(eligible)
     (ROOT/"outreach_report.md").write_text(
         f"# Scout Evidence-Based Outreach Review\n\nProspects in source: {len(leads)}\n"
         f"Websites inspected: {len(rows)}\nOffline drafts prepared: {len(selected)}\n"
-        f"Public business emails found: {ready}\nEmails sent: 0\n\n"
+        f"Public business emails found: {total_contacts}\nEmails in selected drafts: {ready}\nManual verification required: {manual_review}\nEmails sent: 0\n\n"
         "Names and email addresses come from inspected company pages where available. "
         "All findings are preliminary, require human review, and do not establish actual defects. "
         "No Gmail drafts or messages were created.\n",encoding="utf-8")
