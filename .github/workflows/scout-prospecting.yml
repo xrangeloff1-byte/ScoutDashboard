@@ -1,8 +1,6 @@
 name: Scout Prospect Research
 on:
   workflow_dispatch:
-  schedule:
-    - cron: '15 14 * * 1-5'
 permissions:
   contents: read
 jobs:
