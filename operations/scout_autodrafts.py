@@ -1,15 +1,18 @@
 """Scout V3: verified-contact research and Gmail draft creation ONLY. Never sends mail."""
-import base64, csv, email.message, json, os, pathlib, re, urllib.parse, urllib.request
+import base64, csv, email.message, html, json, os, pathlib, re, urllib.parse, urllib.request
 from html.parser import HTMLParser
 
 ROOT=pathlib.Path(__file__).resolve().parent
 IN=ROOT/"qualified_leads.csv"
 OUT=ROOT/"draft_review.csv"
 REPORT=ROOT/"draft_review.md"
+INBOX=ROOT/"draft_inbox.html"
 MAX_DRAFTS=min(max(int(os.getenv("SCOUT_MAX_DRAFTS","5")),0),10)
 class Contacts(HTMLParser):
     def __init__(self):
-        super().__init__(); self.emails=[]; self.links=[]; self.phones=[]; self.forms=0; self.form_fields=set()
+        super().__init__(); self.emails=[]; self.links=[]; self.phones=[]; self.forms=0; self.form_fields=set(); self.text_emails=[]
+    def handle_data(self,data):
+        self.text_emails.extend(re.findall(r"[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}",data))
     def handle_starttag(self,tag,attrs):
         if tag=="form": self.forms+=1
         if tag in ("input","textarea"):
@@ -39,11 +42,11 @@ def find_contact(domain):
         home=Contacts();home.feed(fetch(origin))
         pages=[("public_homepage_mailto",origin,home)]
         checked=set()
-        for link in home.links:
+        for link in list(home.links)+["/contact","/contact-us","/about","/about-us","/get-in-touch"]:
             url=urllib.parse.urljoin(origin,link)
             parsed=urllib.parse.urlparse(url)
             if parsed.scheme!="https" or parsed.hostname!=domain or url in checked: continue
-            if len(checked)>=2: break
+            if len(checked)>=5: break
             checked.add(url)
             try:
                 p=Contacts();p.feed(fetch(url));pages.append(("public_contact_page_mailto",url,p))
@@ -55,7 +58,7 @@ def find_contact(domain):
                 and not any(word in urllib.parse.urlparse(page_url).path.lower() for word in ("/career","/jobs","/employment","/apply"))):
                 fallback_form=page_url
             if parser.phones and not fallback_phone: fallback_phone=parser.phones[0]
-            for address in parser.emails:
+            for address in parser.emails+parser.text_emails:
                 address=address.strip()
                 if re.fullmatch(r"[^\\s@<>]+@[^\\s@<>]+\\.[a-z]{2,}",address,re.I) and address.lower().split("@")[1]==domain.lower():
                     return address,source,fallback_form,fallback_phone
@@ -124,7 +127,7 @@ def main():
         except Exception as e:
             print('Cannot verify existing Gmail drafts; refusing to create duplicates:',type(e).__name__)
             token=''
-    result=[];made=0;used=set()
+    result=[];made=0;used=set(); inbox=[]
     for row in rows:
         domain=row.get("domain","").strip().lower()
         if not domain or domain in used: continue
@@ -148,9 +151,21 @@ def main():
         if form_url and not address:
             item["form_message"]=make_message(row)[1] if all(os.getenv(k) for k in ("SCOUT_SENDER_NAME","SCOUT_BUSINESS_CONTACT")) else ""
         else: item["form_message"]=""
+        business=row.get("business") or domain
+        subject="A quick website question for "+business
+        observation=(row.get("observed_signal") or "").strip()
+        note=("In a preliminary review, I noticed: "+observation+". This may not be a defect. " if row.get("inspection_status")=="FETCHED" and int(row.get("priority_score") or 0)>=25 and observation else "I have not verified any website problems. ")
+        body=("Hello,\n\nI came across "+business+" while researching local service companies. "+note+"Cairnflow Private offers website and customer inquiry improvements. Would a short, no-obligation review be useful?\n\nBest,\n"+(os.getenv("SCOUT_SENDER_NAME") or "Cairnflow Private")+"\n"+(os.getenv("SCOUT_BUSINESS_CONTACT") or "")+"\n")
+        if address and source in ("public_homepage_published_email","public_contact_page_published_email"):
+            inbox.append((business,domain,address,source,form_url,subject,body,item["status"]))
         result.append(item)
     with OUT.open("w",newline="",encoding="utf-8") as f:
         w=csv.DictWriter(f,fieldnames=["business","domain","email","contact_source","contact_form","business_phone","form_message","score","status","gmail_draft_id"]);w.writeheader();w.writerows(result)
+    cards=[]
+    for business,domain,address,source,form_url,subject,body,status in inbox:
+        esc=lambda s: html.escape(str(s or ""),quote=True)
+        cards.append("<article><h2>"+esc(business)+"</h2><p>Website: "+esc(domain)+"</p><p>Public email: "+esc(address or "Not verified")+" ("+esc(source)+")</p><p>Contact form: "+esc(form_url or "Not found")+"</p><p>Status: "+esc(status)+"</p><h3>"+esc(subject)+"</h3><pre>"+esc(body)+"</pre></article>")
+    INBOX.write_text("<!doctype html><html><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>Scout Draft Inbox</title><style>body{font:16px system-ui;max-width:800px;margin:auto;padding:20px;background:#111827;color:#f9fafb}article{border:1px solid #475569;border-radius:12px;padding:16px;margin:16px 0}pre{white-space:pre-wrap;overflow-wrap:anywhere;font:inherit}</style><h1>Scout Draft Review Inbox</h1><p>Only businesses with explicitly published, same-domain email addresses appear here. Publicly observed is not proof of mailbox deliverability. No messages sent. Verify all claims and recipients.</p>"+"".join(cards)+"</html>",encoding="utf-8")
     REPORT.write_text("# Scout Gmail draft review\n\n"
         +f"Businesses reviewed: {len(result)}\nDrafts created (unsent): {made}\nEmails sent: 0\n"
         +f"Gmail OAuth and sender details configured: {configured}\n\n"
