@@ -140,7 +140,7 @@ def main():
               "gmail_draft_id":""}
         if address and address.lower() in previous:
             item['status']='EXISTING_GMAIL_DRAFT_SKIPPED'
-        elif address and int(row.get("priority_score") or 0)>=25 and made<MAX_DRAFTS:
+        elif address and row.get("inspection_status")=="FETCHED" and int(row.get("priority_score") or 0)>=25 and made<MAX_DRAFTS:
             if token:
                 subject,body=make_message(row)
                 try:
@@ -154,9 +154,9 @@ def main():
         business=row.get("business") or domain
         subject="A quick website question for "+business
         observation=(row.get("observed_signal") or "").strip()
-        note=("In a preliminary review, I noticed: "+observation+". This may not be a defect. " if row.get("inspection_status")=="FETCHED" and int(row.get("priority_score") or 0)>=25 and observation else "I have not verified any website problems. ")
+        note=("In a preliminary review, I noticed: "+observation+". This is an observed HTML/HTTP configuration detail, not a confirmed defect or security vulnerability. " if row.get("inspection_status")=="FETCHED" and int(row.get("priority_score") or 0)>=25 and observation else "I have not verified any website problems. ")
         body=("Hello,\n\nI came across "+business+" while researching local service companies. "+note+"Cairnflow Private offers website and customer inquiry improvements. Would a short, no-obligation review be useful?\n\nBest,\n"+(os.getenv("SCOUT_SENDER_NAME") or "Cairnflow Private")+"\n"+(os.getenv("SCOUT_BUSINESS_CONTACT") or "")+"\n")
-        if address and source in ("public_homepage_mailto","public_contact_page_mailto"):
+        if address and row.get("inspection_status")=="FETCHED" and int(row.get("priority_score") or 0)>=25 and source in ("public_homepage_mailto","public_contact_page_mailto") and len(inbox)<MAX_DRAFTS:
             inbox.append((business,domain,address,source,form_url,subject,body,item["status"]))
         result.append(item)
     with OUT.open("w",newline="",encoding="utf-8") as f:
