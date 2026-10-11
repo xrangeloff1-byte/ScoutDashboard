@@ -17,13 +17,13 @@ REPORT = ROOT / "prospect_report.md"
 FIELDS = ["business","website","domain","source_query","public_evidence","potential_service","verification","contact_email","outreach_status","review_status"]
 BLOCKED = {"facebook.com","instagram.com","yelp.com","angi.com","bbb.org","yellowpages.com","linkedin.com","mapquest.com","homeadvisor.com","houzz.com","thumbtack.com"}
 # Small, bounded query for Omaha/Lincoln-area service businesses.
-OVERPASS_ENDPOINTS = ("https://overpass-api.de/api/interpreter", "https://overpass.kumi.systems/api/interpreter")
-QUERY = """[out:json][timeout:20];
+OVERPASS_ENDPOINTS = ("https://overpass.kumi.systems/api/interpreter", "https://overpass-api.de/api/interpreter", "https://overpass.nchc.org.tw/api/interpreter")
+QUERY = """[out:json][timeout:12];
 (
- nwr["craft"~"^(roofer|plumber|hvac|carpenter|builder|landscaper|electrician)$"](around:20000,41.2565,-95.9345);
+ node["craft"~"^(roofer|plumber|hvac|carpenter|builder|landscaper|electrician)$"](around:20000,41.2565,-95.9345);
  nwr["craft"~"^(roofer|plumber|hvac|carpenter|builder|landscaper|electrician)$"](around:12000,40.8136,-96.7026);
 );
-out tags 80;"""
+out tags 45;"""
 
 def normalize_website(raw):
     raw = (raw or "").strip()
@@ -46,7 +46,7 @@ def discover():
             "User-Agent": "ScoutDashboardResearch/1.0 (review-only; GitHub Actions)",
             "Accept": "application/json"}, method="POST")
         try:
-            with urllib.request.urlopen(req, timeout=25) as response:
+            with urllib.request.urlopen(req, timeout=17) as response:
                 payload = json.load(response)
             break
         except (OSError, ValueError, urllib.error.URLError, json.JSONDecodeError) as exc:
@@ -98,8 +98,9 @@ def main():
     REPORT.write_text("\n".join(lines)+"\n",encoding="utf-8")
     print("Scout free research: "+str(len(existing))+" leads; "+str(new)+" new; "+str(len(errors))+" warnings")
     if errors:
-        print("DISCOVERY ERROR: " + "; ".join(errors))
-        raise SystemExit(1)
+        print("DISCOVERY WARNING: " + "; ".join(errors))
+        if existing:
+            print("Using previously discovered businesses; no new search results this run.")
     if not existing:
         print("DISCOVERY EMPTY: no website-bearing businesses found; inspect source and filters")
         raise SystemExit(1)
