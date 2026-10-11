@@ -24,6 +24,8 @@ jobs:
           key: scout-prospects-${{ github.run_id }}
           restore-keys: |
             scout-prospects-
+      - name: Validate Scout Python syntax
+        run: python -m py_compile operations/scout_prospect.py operations/scout_qualify.py operations/scout_autodrafts.py operations/scout_dashboard.py
       - name: Discover businesses from free public data
         run: python operations/scout_prospect.py
       - name: Save discovered businesses for future runs
