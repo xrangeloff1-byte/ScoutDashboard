@@ -40,6 +40,7 @@ jobs:
             operations/prospect_report.md
             operations/draft_review.csv
             operations/draft_review.md
+            operations/draft_inbox.html
             operations/outreach_drafts.md
             operations/qualification_report.md
           retention-days: 7
