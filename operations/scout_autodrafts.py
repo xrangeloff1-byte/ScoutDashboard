@@ -155,8 +155,8 @@ def main():
             item["form_message"]=make_message(row)[1] if all(os.getenv(k) for k in ("SCOUT_SENDER_NAME","SCOUT_BUSINESS_CONTACT")) else ""
         else: item["form_message"]=""
         business=row.get("business") or domain
-        subject="A quick website question for "+business
-        observation=(row.get("observed_signal") or "").strip()
+        subject="A small website improvement for "+business
+        observation=(row.get("observed_signal") or "").split(";")[0].strip()
         note=("In a preliminary review, I noticed: "+observation+". This is an observed HTML/HTTP configuration detail, not a confirmed defect or security vulnerability. " if row.get("inspection_status")=="FETCHED" and int(row.get("priority_score") or 0)>=25 and observation else "I have not verified any website problems. ")
         body=("Hello,\n\nI came across "+business+" while researching local service companies. "+note+"Cairnflow Private offers website and customer inquiry improvements. Would a short, no-obligation review be useful?\n\nBest,\n"+AGENT_NAME+"\n"+AGENT_ROLE+"\nCairnflow Private"+"\n"+AGENT_CONTACT+"\n")
         if address and row.get("inspection_status")=="FETCHED" and int(row.get("priority_score") or 0)>=25 and source in ("public_homepage_mailto","public_contact_page_mailto") and len(inbox)<MAX_DRAFTS:
