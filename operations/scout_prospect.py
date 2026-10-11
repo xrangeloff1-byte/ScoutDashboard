@@ -1,112 +1,93 @@
-"""Scout prospect discovery: public search snippets -> review-only lead queue.
-No emails are sent. Requires SERPER_API_KEY for live discovery.
+"""Scout free prospect research from OpenStreetMap community data.
+Review-only. No paid search, email sending, or Gmail operations.
+Overpass is a public, best-effort service: honor its usage policy and failures.
 """
 import csv
 import datetime as dt
 import json
-import os
 import pathlib
 import re
+import urllib.error
+import urllib.parse
 import urllib.request
-from urllib.parse import urlparse
 
 ROOT = pathlib.Path(__file__).resolve().parent
 OUT = ROOT / "prospects.csv"
 REPORT = ROOT / "prospect_report.md"
-# Focus on businesses where one qualified inquiry may justify a paid website project.
-# Search results are leads for human review, not proof of budget or website defects.
-QUERIES = [
-    "Omaha NE commercial roofing contractor company website",
-    "Omaha NE commercial HVAC mechanical contractor website",
-    "Omaha NE water damage restoration company website",
-    "Omaha NE kitchen bathroom remodeling contractor website",
-    "Lincoln NE commercial plumbing contractor company website",
-    "Lincoln NE HVAC installation contractor company website",
-    "Lincoln NE roofing restoration contractor website",
-    "Omaha NE concrete foundation repair contractor website",
-    "Omaha NE commercial landscaping contractor website",
-    "Lincoln NE custom home builder remodeling contractor website",
-]
-BLOCKED = {"facebook.com", "instagram.com", "yelp.com", "angi.com", "bbb.org",
-           "yellowpages.com", "linkedin.com", "mapquest.com", "homeadvisor.com",
-           "houzz.com", "thumbtack.com", "chamberofcommerce.com", "porch.com",
-           "buildzoom.com", "expertise.com", "threebestrated.com"}
+FIELDS = ["business","website","domain","source_query","public_evidence","potential_service","verification","contact_email","outreach_status","review_status"]
+BLOCKED = {"facebook.com","instagram.com","yelp.com","angi.com","bbb.org","yellowpages.com","linkedin.com","mapquest.com","homeadvisor.com","houzz.com","thumbtack.com"}
+# Small, bounded query for Omaha/Lincoln-area service businesses.
+OVERPASS = "https://overpass-api.de/api/interpreter"
+QUERY = """[out:json][timeout:20];
+(
+ nwr["craft"~"^(roofer|plumber|hvac|carpenter|builder|landscaper|electrician)$"](around:20000,41.2565,-95.9345);
+ nwr["craft"~"^(roofer|plumber|hvac|carpenter|builder|landscaper|electrician)$"](around:12000,40.8136,-96.7026);
+);
+out tags 80;"""
 
-def domain(url):
-    host = (urlparse(url).hostname or "").lower()
-    return host.removeprefix("www.")
+def normalize_website(raw):
+    raw = (raw or "").strip()
+    if not raw or len(raw) > 400: return None
+    if not re.match(r"^https?://", raw, re.I): raw = "https://" + raw
+    p = urllib.parse.urlparse(raw)
+    host = (p.hostname or "").lower().removeprefix("www.")
+    if p.scheme != "https" or not host or not re.fullmatch(r"[a-z0-9.-]+", host):
+        return None
+    if p.username or p.password or p.port not in (None,443): return None
+    if not "." in host or any(host == x or host.endswith("." + x) for x in BLOCKED): return None
+    return "https://" + host + "/", host
 
-def candidates(payload, query):
-    for item in payload.get("organic", []):
-        url = item.get("link", "")
-        host = domain(url)
-        if not host or any(host == x or host.endswith("." + x) for x in BLOCKED):
-            continue
-        if not url.startswith(("http://", "https://")):
-            continue
-        yield {
-            "business": item.get("title", "").strip()[:140],
-            "website": url,
-            "domain": host,
-            "source_query": query,
-            "public_evidence": item.get("snippet", "").strip()[:400],
-            "potential_service": "Website review / mobile usability / lead capture",
-            "verification": "UNVERIFIED - inspect website before alleging any issue",
-            "contact_email": "",
-            "outreach_status": "RESEARCH_ONLY",
-            "review_status": "PENDING",
-        }
-
-def search(query, key):
-    body = json.dumps({"q": query, "num": 10}).encode()
-    request = urllib.request.Request(
-        "https://google.serper.dev/search", data=body,
-        headers={"X-API-KEY": key, "Content-Type": "application/json"},
-        method="POST")
-    with urllib.request.urlopen(request, timeout=25) as response:
-        return json.load(response)
+def discover():
+    data = urllib.parse.urlencode({"data": QUERY}).encode()
+    req = urllib.request.Request(OVERPASS, data=data, headers={
+        "User-Agent": "ScoutDashboardResearch/1.0 (review-only; GitHub Actions)",
+        "Accept": "application/json"}, method="POST")
+    with urllib.request.urlopen(req, timeout=30) as response:
+        payload = json.load(response)
+    for item in payload.get("elements", []):
+        tags = item.get("tags") or {}
+        name = (tags.get("name") or "").strip()
+        website = normalize_website(tags.get("website") or tags.get("contact:website"))
+        if not name or not website: continue
+        url, host = website
+        yield {"business":name[:140], "website":url, "domain":host,
+               "source_query":"OpenStreetMap public business listing",
+               "public_evidence":"OSM object "+str(item.get("type",""))+"/"+str(item.get("id",""))+
+                                 "; craft="+str(tags.get("craft",""))[:40],
+               "potential_service":"Website and inquiry-path review",
+               "verification":"UNVERIFIED - verify business and website independently",
+               "contact_email":"", "outreach_status":"RESEARCH_ONLY", "review_status":"PENDING"}
 
 def main():
-    key = os.environ.get("SERPER_API_KEY", "").strip()
     existing = {}
     if OUT.exists():
-        with OUT.open(newline="", encoding="utf-8") as f:
+        with OUT.open(newline="",encoding="utf-8") as f:
             for row in csv.DictReader(f):
-                if row.get("domain"):
-                    existing[row["domain"]] = row
+                if row.get("domain"): existing[row["domain"]] = row
     new = 0
     errors = []
-    if key:
-        for query in QUERIES:
-            try:
-                for row in candidates(search(query, key), query):
-                    if row["domain"] not in existing:
-                        existing[row["domain"]] = row
-                        new += 1
-            except Exception as exc:
-                errors.append(f"{query}: {type(exc).__name__}: {exc}")
-    fields = ["business", "website", "domain", "source_query", "public_evidence",
-              "potential_service", "verification", "contact_email",
-              "outreach_status", "review_status"]
-    with OUT.open("w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=fields, extrasaction="ignore")
+    try:
+        for row in discover():
+            if row["domain"] not in existing and new < 25:
+                existing[row["domain"]] = row
+                new += 1
+    except (OSError, ValueError, urllib.error.URLError, json.JSONDecodeError) as exc:
+        errors.append(type(exc).__name__ + ": " + str(exc)[:180])
+    with OUT.open("w",newline="",encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=FIELDS, extrasaction="ignore")
         writer.writeheader()
         writer.writerows(existing.values())
-    today = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
-    lines = ["# Scout Prospect Report", "", f"Generated: {today}",
-             f"Prospects in queue: {len(existing)}", f"New this run: {new}",
-             f"Search configured: {'yes' if key else 'no - add SERPER_API_KEY'}",
-             "", "## Review queue", "",
-             "These are possible leads, not verified website problems. No outreach sent.", ""]
-    for row in list(existing.values())[:30]:
-        lines.append(f"- {row['business']} — {row['website']} — {row['review_status']}")
+    now = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    lines = ["# Scout Free Prospect Report", "", "Generated: "+now,
+             "Source: OpenStreetMap via public Overpass API (attribution: © OpenStreetMap contributors)",
+             "Existing and new leads are unverified; human review required.",
+             "Prospects: "+str(len(existing)), "New this run: "+str(new),
+             "Emails sent: 0", "", "## Review queue", ""]
+    lines += ["- "+r.get("business","")+" — "+r.get("website","") for r in list(existing.values())[:30]]
     if errors:
-        lines.extend(["", "## Search errors", *["- " + e for e in errors]])
-    REPORT.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    print(f"Scout: {len(existing)} prospects, {new} new; {len(errors)} search errors")
-    if errors:
-        print("\n".join(errors))
-        raise SystemExit(1)
+        lines += ["", "## Discovery warning (existing leads preserved)", *["- "+e for e in errors]]
+    REPORT.write_text("\n".join(lines)+"\n",encoding="utf-8")
+    print("Scout free research: "+str(len(existing))+" leads; "+str(new)+" new; "+str(len(errors))+" warnings")
 
 if __name__ == "__main__":
     main()
