@@ -17,7 +17,7 @@ REPORT = ROOT / "prospect_report.md"
 FIELDS = ["business","website","domain","source_query","public_evidence","potential_service","verification","contact_email","outreach_status","review_status"]
 BLOCKED = {"facebook.com","instagram.com","yelp.com","angi.com","bbb.org","yellowpages.com","linkedin.com","mapquest.com","homeadvisor.com","houzz.com","thumbtack.com"}
 # Small, bounded query for Omaha/Lincoln-area service businesses.
-OVERPASS = "https://overpass-api.de/api/interpreter"
+OVERPASS_ENDPOINTS = ("https://overpass-api.de/api/interpreter", "https://overpass.kumi.systems/api/interpreter")
 QUERY = """[out:json][timeout:20];
 (
  nwr["craft"~"^(roofer|plumber|hvac|carpenter|builder|landscaper|electrician)$"](around:20000,41.2565,-95.9345);
@@ -39,11 +39,20 @@ def normalize_website(raw):
 
 def discover():
     data = urllib.parse.urlencode({"data": QUERY}).encode()
-    req = urllib.request.Request(OVERPASS, data=data, headers={
-        "User-Agent": "ScoutDashboardResearch/1.0 (review-only; GitHub Actions)",
-        "Accept": "application/json"}, method="POST")
-    with urllib.request.urlopen(req, timeout=30) as response:
-        payload = json.load(response)
+    payload = None
+    failures = []
+    for endpoint in OVERPASS_ENDPOINTS:
+        req = urllib.request.Request(endpoint, data=data, headers={
+            "User-Agent": "ScoutDashboardResearch/1.0 (review-only; GitHub Actions)",
+            "Accept": "application/json"}, method="POST")
+        try:
+            with urllib.request.urlopen(req, timeout=25) as response:
+                payload = json.load(response)
+            break
+        except (OSError, ValueError, urllib.error.URLError, json.JSONDecodeError) as exc:
+            failures.append(endpoint + ": " + type(exc).__name__ + " " + str(exc)[:120])
+    if payload is None:
+        raise RuntimeError("All free Overpass endpoints failed: " + "; ".join(failures))
     for item in payload.get("elements", []):
         tags = item.get("tags") or {}
         name = (tags.get("name") or "").strip()
@@ -71,7 +80,7 @@ def main():
             if row["domain"] not in existing and new < 25:
                 existing[row["domain"]] = row
                 new += 1
-    except (OSError, ValueError, urllib.error.URLError, json.JSONDecodeError) as exc:
+    except (OSError, ValueError, RuntimeError, urllib.error.URLError, json.JSONDecodeError) as exc:
         errors.append(type(exc).__name__ + ": " + str(exc)[:180])
     with OUT.open("w",newline="",encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=FIELDS, extrasaction="ignore")
@@ -88,6 +97,12 @@ def main():
         lines += ["", "## Discovery warning (existing leads preserved)", *["- "+e for e in errors]]
     REPORT.write_text("\n".join(lines)+"\n",encoding="utf-8")
     print("Scout free research: "+str(len(existing))+" leads; "+str(new)+" new; "+str(len(errors))+" warnings")
+    if errors:
+        print("DISCOVERY ERROR: " + "; ".join(errors))
+        raise SystemExit(1)
+    if not existing:
+        print("DISCOVERY EMPTY: no website-bearing businesses found; inspect source and filters")
+        raise SystemExit(1)
 
 if __name__ == "__main__":
     main()
