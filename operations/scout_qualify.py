@@ -34,6 +34,8 @@ class PageParser(HTMLParser):
         self.contact = False
         self.images_missing_alt = 0
         self.images_seen = 0
+        self.text_chars = 0
+        self.paragraphs = 0
     def handle_starttag(self, tag, attrs):
         a = dict(attrs)
         if tag == "title": self.in_title = True
@@ -45,12 +47,14 @@ class PageParser(HTMLParser):
             self.images_seen += 1
             if "alt" not in a: self.images_missing_alt += 1
         if tag == "h1": self.h1 = True
+        if tag == "p": self.paragraphs += 1
         if tag == "a" and any(x in (a.get("href", "") + " " + a.get("aria-label", "")).lower() for x in ("contact", "tel:", "mailto:", "quote", "estimate")):
             self.contact = True
     def handle_endtag(self, tag):
         if tag == "title": self.in_title = False
     def handle_data(self, data):
         if self.in_title: self.title += data
+        else: self.text_chars += len(data.strip())
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
@@ -94,20 +98,29 @@ def inspect(url):
 
 def choose_offer(parser):
     if not parser: return "Website review", "No website problem verified", 0
-    # Findings describe observable responses, not confirmed security vulnerabilities.
+    # Observable HTML/HTTP details only, not proof of an actual customer-facing defect.
     signals = []
-    if not parser.viewport: signals.append("Homepage HTML lacks a viewport meta tag")
-    if not parser.description: signals.append("Homepage HTML lacks a meta description")
-    if not parser.h1: signals.append("Homepage HTML lacks an H1 heading")
+    if not parser.contact and not parser.form:
+        signals.append(("No contact/quote link or form observed in homepage HTML", 38, "Customer inquiry-path improvement"))
+    if not parser.viewport:
+        signals.append(("Viewport meta tag absent from homepage HTML", 22, "Mobile usability review"))
     if parser.images_missing_alt:
-        signals.append(str(parser.images_missing_alt)+" of "+str(parser.images_seen)+" homepage images lack alt attributes")
+        signals.append((str(parser.images_missing_alt)+" of "+str(parser.images_seen)+" homepage images have no alt attribute", 26, "Accessibility improvement"))
+    if not parser.description:
+        signals.append(("Homepage meta description absent from HTML", 16, "Search presentation improvement"))
+    if not parser.h1:
+        signals.append(("No H1 heading observed in homepage HTML", 14, "Content structure improvement"))
+    if parser.text_chars < 500 and parser.paragraphs < 3:
+        signals.append(("Homepage contains limited HTML text ("+str(parser.text_chars)+" characters; JS-rendered content not assessed)", 32, "Complete website content and makeover review"))
     headers = {k.lower():v for k,v in getattr(parser,"response_headers",{}).items()}
     if "content-security-policy" not in headers:
-        signals.append("Homepage HTTP response lacks a Content-Security-Policy header (configuration review suggested)")
+        signals.append(("CSP response header not observed (not proof of vulnerability)", 7, "Passive security configuration review"))
     if "x-content-type-options" not in headers:
-        signals.append("Homepage HTTP response lacks an X-Content-Type-Options header")
+        signals.append(("X-Content-Type-Options response header not observed", 5, "Passive security configuration review"))
     if not signals: return "Website review", "No targeted gaps observed in fetched homepage", 0
-    return "Website accessibility, metadata and security-header review", "; ".join(signals), min(60, 20+8*len(signals))
+    signals.sort(key=lambda s:-s[1])
+    top = signals[0]
+    return top[2], "; ".join(x[0] for x in signals[:5]), min(60,top[1]+min(len(signals)-1,3)*4)
 
 def draft(row):
     business = row["business"].strip() or row["domain"]
@@ -121,7 +134,7 @@ def draft(row):
             + "Hello,\n\n" + note + "\n\n"
             + "Cairnflow Private helps businesses with practical website improvements, including " + offer.lower() + ". "
             + "Would a short, no-obligation website review be useful?\n\n"
-            + "Best,\nCairnflow Private\n"
+            + "Best,\nJohn Laering\nVirtual Client Relations Agent\nCairnflow Private\n"
             + "[Add approved sender identity, contact information and opt-out wording before any outreach]\n")
 
 def main():

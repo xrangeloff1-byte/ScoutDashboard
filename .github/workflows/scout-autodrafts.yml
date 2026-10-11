@@ -24,6 +24,8 @@ jobs:
           key: scout-prospects-${{ github.run_id }}
           restore-keys: |
             scout-prospects-
+      - name: Validate Scout Python syntax
+        run: python -m py_compile operations/scout_prospect.py operations/scout_qualify.py operations/scout_autodrafts.py operations/scout_dashboard.py
       - name: Discover businesses from free public data
         run: python operations/scout_prospect.py
       - name: Save discovered businesses for future runs
@@ -43,6 +45,8 @@ jobs:
           SCOUT_BUSINESS_CONTACT: ${{ vars.SCOUT_BUSINESS_CONTACT }}
           SCOUT_MAX_DRAFTS: '5'
         run: python operations/scout_autodrafts.py
+      - name: Build offline Scout command center
+        run: python operations/scout_dashboard.py
       - name: Upload review package
         if: always()
         uses: actions/upload-artifact@v4
@@ -54,6 +58,8 @@ jobs:
             operations/draft_review.csv
             operations/draft_review.md
             operations/draft_inbox.html
+            operations/scout_command_center.html
+            operations/qualified_leads.csv
             operations/outreach_drafts.md
             operations/qualification_report.md
           retention-days: 7

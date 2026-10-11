@@ -8,6 +8,9 @@ OUT=ROOT/"draft_review.csv"
 REPORT=ROOT/"draft_review.md"
 INBOX=ROOT/"draft_inbox.html"
 MAX_DRAFTS=min(max(int(os.getenv("SCOUT_MAX_DRAFTS","5")),0),10)
+AGENT_NAME="John Laering"
+AGENT_ROLE="Virtual Client Relations Agent"
+AGENT_CONTACT=os.getenv("SCOUT_BUSINESS_CONTACT") or "cairnflowprivate@gmail.com"
 class Contacts(HTMLParser):
     def __init__(self):
         super().__init__(); self.emails=[]; self.links=[]; self.phones=[]; self.forms=0; self.form_fields=set(); self.text_emails=[]
@@ -72,8 +75,8 @@ def make_message(row):
           "mobile-friendly presentation and customer inquiry forms.\n\n"
           "Would you be interested in a short, no-obligation website review? "
           "I'd share suggestions before proposing any work.\n\n"
-          "Best,\n"+os.environ["SCOUT_SENDER_NAME"]+"\nCairnflow Private\n"
-          +os.environ["SCOUT_BUSINESS_CONTACT"]+"\n"
+          "Best,\n"+AGENT_NAME+"\n"+AGENT_ROLE+"\nCairnflow Private\n"
+          +AGENT_CONTACT+"\n"
           "If you'd prefer no further messages, reply 'no thanks' and I'll respect that.\n")
     return subject,body
 def gmail_draft(to,subject,body,token):
@@ -152,10 +155,10 @@ def main():
             item["form_message"]=make_message(row)[1] if all(os.getenv(k) for k in ("SCOUT_SENDER_NAME","SCOUT_BUSINESS_CONTACT")) else ""
         else: item["form_message"]=""
         business=row.get("business") or domain
-        subject="A quick website question for "+business
-        observation=(row.get("observed_signal") or "").strip()
+        subject="A small website improvement for "+business
+        observation=(row.get("observed_signal") or "").split(";")[0].strip()
         note=("In a preliminary review, I noticed: "+observation+". This is an observed HTML/HTTP configuration detail, not a confirmed defect or security vulnerability. " if row.get("inspection_status")=="FETCHED" and int(row.get("priority_score") or 0)>=25 and observation else "I have not verified any website problems. ")
-        body=("Hello,\n\nI came across "+business+" while researching local service companies. "+note+"Cairnflow Private offers website and customer inquiry improvements. Would a short, no-obligation review be useful?\n\nBest,\n"+(os.getenv("SCOUT_SENDER_NAME") or "Cairnflow Private")+"\n"+(os.getenv("SCOUT_BUSINESS_CONTACT") or "")+"\n")
+        body=("Hello,\n\nI came across "+business+" while researching local service companies. "+note+"Cairnflow Private offers website and customer inquiry improvements. Would a short, no-obligation review be useful?\n\nBest,\n"+AGENT_NAME+"\n"+AGENT_ROLE+"\nCairnflow Private"+"\n"+AGENT_CONTACT+"\n")
         if address and row.get("inspection_status")=="FETCHED" and int(row.get("priority_score") or 0)>=25 and source in ("public_homepage_mailto","public_contact_page_mailto") and len(inbox)<MAX_DRAFTS:
             inbox.append((business,domain,address,source,form_url,subject,body,item["status"]))
         result.append(item)
