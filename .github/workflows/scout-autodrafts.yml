@@ -17,13 +17,11 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Discover businesses
-        env:
-          SERPER_API_KEY: ${{ secrets.SERPER_API_KEY }}
+      - name: Discover businesses from free public data
         run: python operations/scout_prospect.py
       - name: Qualify websites
         run: python operations/scout_qualify.py
-      - name: Find public contacts and prepare Gmail drafts if OAuth is configured
+      - name: Prepare Gmail drafts only if OAuth is configured (never send)
         env:
           GMAIL_CLIENT_ID: ${{ secrets.GMAIL_CLIENT_ID }}
           GMAIL_CLIENT_SECRET: ${{ secrets.GMAIL_CLIENT_SECRET }}
@@ -38,6 +36,8 @@ jobs:
         with:
           name: scout-autodrafts-review
           path: |
+            operations/prospects.csv
+            operations/prospect_report.md
             operations/draft_review.csv
             operations/draft_review.md
             operations/outreach_drafts.md
