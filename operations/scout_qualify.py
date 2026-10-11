@@ -9,7 +9,8 @@ import html
 import ipaddress
 import pathlib
 import re
-import socket\nimport json
+import socket
+import json
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -30,14 +31,19 @@ class PageParser(HTMLParser):
         self.description = False
         self.form = False
         self.h1 = False
-        self.contact = False\n        self.images_missing_alt = 0\n        self.images_seen = 0
+        self.contact = False
+        self.images_missing_alt = 0
+        self.images_seen = 0
     def handle_starttag(self, tag, attrs):
         a = dict(attrs)
         if tag == "title": self.in_title = True
         if tag == "meta":
             if a.get("name", "").lower() == "viewport": self.viewport = True
             if a.get("name", "").lower() == "description": self.description = bool(a.get("content", "").strip())
-        if tag == "form": self.form = True\n        if tag == "img":\n            self.images_seen += 1\n            if "alt" not in a: self.images_missing_alt += 1
+        if tag == "form": self.form = True
+        if tag == "img":
+            self.images_seen += 1
+            if "alt" not in a: self.images_missing_alt += 1
         if tag == "h1": self.h1 = True
         if tag == "a" and any(x in (a.get("href", "") + " " + a.get("aria-label", "")).lower() for x in ("contact", "tel:", "mailto:", "quote", "estimate")):
             self.contact = True
@@ -79,7 +85,8 @@ def inspect(url):
             raw = res.read(250_000)
             parser = PageParser()
             parser.feed(raw.decode("utf-8", errors="replace"))
-            parser.response_headers = dict(res.headers.items())\n            return "FETCHED", parser, "Public homepage HTML inspected"
+            parser.response_headers = dict(res.headers.items())
+            return "FETCHED", parser, "Public homepage HTML inspected"
     except urllib.error.HTTPError as e:
         return "HTTP_" + str(e.code), None, "Homepage fetch did not return HTML; no defect inferred"
     except Exception as e:
@@ -164,7 +171,8 @@ def main():
         f"Drafts prepared: {len(top)}",
         "Emails sent: 0",
         "",
-        "Findings are verified observations from the fetched HTML/HTTP response, not proof of defects or exploitable vulnerabilities. Browser and human review required.",\n        "Passive GET-only inspection: no exploitation, scanning, login attempts, or penetration testing.",
+        "Findings are verified observations from the fetched HTML/HTTP response, not proof of defects or exploitable vulnerabilities. Browser and human review required.",
+        "Passive GET-only inspection: no exploitation, scanning, login attempts, or penetration testing.",
         "No contacts were harvested and no email was sent."
     ]) + "\n", encoding="utf-8")
     print(f"Scout qualified {len(results)} candidates, inspected {sum(x['inspection_status']=='FETCHED' for x in results)} pages, prepared {len(top)} unsent drafts")
