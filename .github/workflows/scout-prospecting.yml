@@ -1,4 +1,4 @@
-name: Scout Prospect Research
+name: Scout Free Prospect Research
 on:
   workflow_dispatch:
 permissions:
@@ -6,21 +6,20 @@ permissions:
 jobs:
   research:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Research public business leads
-        env:
-          SERPER_API_KEY: ${{ secrets.SERPER_API_KEY }}
+      - name: Discover public business candidates without paid APIs
         run: python operations/scout_prospect.py
       - name: Upload review queue
-        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: scout-prospect-review
           path: |
             operations/prospects.csv
             operations/prospect_report.md
-          retention-days: 30
+          retention-days: 7
+          if-no-files-found: error
