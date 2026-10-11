@@ -75,7 +75,7 @@ def make_message(row):
           "mobile-friendly presentation and customer inquiry forms.\n\n"
           "Would you be interested in a short, no-obligation website review? "
           "I'd share suggestions before proposing any work.\n\n"
-          "Best,\n"+AGENT_NAME+"\nCairnflow Private\n"
+          "Best,\n"+AGENT_NAME+"\n"+AGENT_ROLE+"\nCairnflow Private\n"
           +AGENT_CONTACT+"\n"
           "If you'd prefer no further messages, reply 'no thanks' and I'll respect that.\n")
     return subject,body
