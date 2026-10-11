@@ -156,7 +156,8 @@ def main():
         observation=(row.get("observed_signal") or "").strip()
         note=("In a preliminary review, I noticed: "+observation+". This may not be a defect. " if row.get("inspection_status")=="FETCHED" and int(row.get("priority_score") or 0)>=25 and observation else "I have not verified any website problems. ")
         body=("Hello,\n\nI came across "+business+" while researching local service companies. "+note+"Cairnflow Private offers website and customer inquiry improvements. Would a short, no-obligation review be useful?\n\nBest,\n"+(os.getenv("SCOUT_SENDER_NAME") or "Cairnflow Private")+"\n"+(os.getenv("SCOUT_BUSINESS_CONTACT") or "")+"\n")
-        inbox.append((business,domain,address,source,form_url,subject,body,item["status"]))
+        if address and source in ("public_homepage_published_email","public_contact_page_published_email"):
+            inbox.append((business,domain,address,source,form_url,subject,body,item["status"]))
         result.append(item)
     with OUT.open("w",newline="",encoding="utf-8") as f:
         w=csv.DictWriter(f,fieldnames=["business","domain","email","contact_source","contact_form","business_phone","form_message","score","status","gmail_draft_id"]);w.writeheader();w.writerows(result)
@@ -164,7 +165,7 @@ def main():
     for business,domain,address,source,form_url,subject,body,status in inbox:
         esc=lambda s: html.escape(str(s or ""),quote=True)
         cards.append("<article><h2>"+esc(business)+"</h2><p>Website: "+esc(domain)+"</p><p>Public email: "+esc(address or "Not verified")+" ("+esc(source)+")</p><p>Contact form: "+esc(form_url or "Not found")+"</p><p>Status: "+esc(status)+"</p><h3>"+esc(subject)+"</h3><pre>"+esc(body)+"</pre></article>")
-    INBOX.write_text("<!doctype html><html><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>Scout Draft Inbox</title><style>body{font:16px system-ui;max-width:800px;margin:auto;padding:20px;background:#111827;color:#f9fafb}article{border:1px solid #475569;border-radius:12px;padding:16px;margin:16px 0}pre{white-space:pre-wrap;overflow-wrap:anywhere;font:inherit}</style><h1>Scout Draft Review Inbox</h1><p>Local review drafts only. No messages sent. Verify all claims and recipients.</p>"+"".join(cards)+"</html>",encoding="utf-8")
+    INBOX.write_text("<!doctype html><html><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>Scout Draft Inbox</title><style>body{font:16px system-ui;max-width:800px;margin:auto;padding:20px;background:#111827;color:#f9fafb}article{border:1px solid #475569;border-radius:12px;padding:16px;margin:16px 0}pre{white-space:pre-wrap;overflow-wrap:anywhere;font:inherit}</style><h1>Scout Draft Review Inbox</h1><p>Only businesses with explicitly published, same-domain email addresses appear here. Publicly observed is not proof of mailbox deliverability. No messages sent. Verify all claims and recipients.</p>"+"".join(cards)+"</html>",encoding="utf-8")
     REPORT.write_text("# Scout Gmail draft review\n\n"
         +f"Businesses reviewed: {len(result)}\nDrafts created (unsent): {made}\nEmails sent: 0\n"
         +f"Gmail OAuth and sender details configured: {configured}\n\n"
