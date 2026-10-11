@@ -25,7 +25,7 @@ jobs:
           restore-keys: |
             scout-prospects-
       - name: Validate Scout Python syntax
-        run: python -m py_compile operations/scout_prospect.py operations/scout_qualify.py operations/scout_autodrafts.py operations/scout_dashboard.py
+        run: python -m py_compile operations/scout_prospect.py operations/scout_qualify.py operations/scout_autodrafts.py operations/scout_dashboard.py operations/scout_diagnostics.py
       - name: Discover businesses from free public data
         run: python operations/scout_prospect.py
       - name: Save discovered businesses for future runs
@@ -36,6 +36,8 @@ jobs:
           key: scout-prospects-${{ github.run_id }}
       - name: Qualify websites
         run: python operations/scout_qualify.py
+      - name: Generate offline prioritized diagnostic findings
+        run: python operations/scout_diagnostics.py
       - name: Prepare Gmail drafts only if OAuth is configured (never send)
         env:
           GMAIL_CLIENT_ID: ${{ secrets.GMAIL_CLIENT_ID }}
@@ -60,6 +62,7 @@ jobs:
             operations/draft_inbox.html
             operations/scout_command_center.html
             operations/qualified_leads.csv
+            operations/diagnostic_findings.json
             operations/outreach_drafts.md
             operations/qualification_report.md
           retention-days: 7
