@@ -26,7 +26,7 @@ class Contacts(HTMLParser):
         if href.lower().startswith("mailto:"):
             address=urllib.parse.unquote(href[7:].split("?")[0]).strip()
             self.emails.append(address)
-        if any(w in href.lower() for w in ("contact","about")): self.links.append(href)
+        if any(w in href.lower() for w in ("contact","about","get-in-touch")): self.links.append(href)
 def fetch(url):
     req=urllib.request.Request(url,headers={"User-Agent":"ScoutResearch/1.0","Accept":"text/html"})
     with urllib.request.urlopen(req,timeout=8) as res:
@@ -60,7 +60,7 @@ def find_contact(domain):
             if parser.phones and not fallback_phone: fallback_phone=parser.phones[0]
             for address in parser.emails+parser.text_emails:
                 address=address.strip()
-                if re.fullmatch(r"[^\\s@<>]+@[^\\s@<>]+\\.[a-z]{2,}",address,re.I) and address.lower().split("@")[1]==domain.lower():
+                if re.fullmatch(r"[^\s@<>]+@[^\s@<>]+\.[a-z]{2,}",address,re.I) and address.lower().split("@")[1]==domain.lower():
                     return address,source,fallback_form,fallback_phone
         return "","no_same_domain_public_mailto",fallback_form,fallback_phone
     except Exception as e: return "","lookup_"+type(e).__name__,"",""
@@ -107,7 +107,7 @@ def existing_draft_recipients(token):
             with urllib.request.urlopen(req,timeout=20) as res: info=json.load(res)
             headers={h["name"].lower():h["value"] for h in info.get("message",{}).get("payload",{}).get("headers",[])}
             if headers.get("subject","").startswith("A quick website question for "):
-                for address in re.findall(r"[A-Za-z0-9._%+\\-]+@[A-Za-z0-9.\\-]+\\.[A-Za-z]{2,}",headers.get("to","")):
+                for address in re.findall(r"[A-Za-z0-9._%+\\-]+@[A-Za-z0-9.\\-]+\.[A-Za-z]{2,}",headers.get("to","")):
                     recipients.add(address.lower())
         page=data.get("nextPageToken","")
         if not page: break
@@ -118,7 +118,7 @@ def main():
     with IN.open(newline="",encoding="utf-8") as f: rows=list(csv.DictReader(f))
     token=""
     configured=all(os.getenv(k) for k in ("SCOUT_SENDER_NAME","SCOUT_BUSINESS_CONTACT","GMAIL_CLIENT_ID","GMAIL_CLIENT_SECRET","GMAIL_REFRESH_TOKEN"))
-    if configured:
+    if configured and os.getenv("SCOUT_ENABLE_GMAIL_DRAFTS","false").lower()=="true":
         try: token=refresh_token()
         except Exception as e: print("Gmail OAuth unavailable:",type(e).__name__)
     previous=set()
@@ -156,7 +156,7 @@ def main():
         observation=(row.get("observed_signal") or "").strip()
         note=("In a preliminary review, I noticed: "+observation+". This may not be a defect. " if row.get("inspection_status")=="FETCHED" and int(row.get("priority_score") or 0)>=25 and observation else "I have not verified any website problems. ")
         body=("Hello,\n\nI came across "+business+" while researching local service companies. "+note+"Cairnflow Private offers website and customer inquiry improvements. Would a short, no-obligation review be useful?\n\nBest,\n"+(os.getenv("SCOUT_SENDER_NAME") or "Cairnflow Private")+"\n"+(os.getenv("SCOUT_BUSINESS_CONTACT") or "")+"\n")
-        if address and source in ("public_homepage_published_email","public_contact_page_published_email"):
+        if address and source in ("public_homepage_mailto","public_contact_page_mailto"):
             inbox.append((business,domain,address,source,form_url,subject,body,item["status"]))
         result.append(item)
     with OUT.open("w",newline="",encoding="utf-8") as f:
@@ -172,5 +172,5 @@ def main():
         +"Contact research checks published same-domain email links, forms with message/email fields, and telephone links on public pages. Form links are review-only; no forms are submitted. "
         +"These addresses and the proposed messages require manual verification before sending. "
         +"Do not use automated sending without separate authorization and compliance checks.\n",encoding="utf-8")
-    print(f"Scout autodrafts: {len(result)} businesses, {sum(bool(x['email']) for x in result)} public contacts, {made} Gmail drafts, 0 sent")
+    print(f"Scout autodrafts: {len(result)} businesses, {sum(bool(x['email']) for x in result)} public contacts, {len(inbox)} inbox drafts, {made} Gmail drafts, 0 sent")
 if __name__=="__main__": main()
