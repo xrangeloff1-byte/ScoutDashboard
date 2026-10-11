@@ -8,6 +8,9 @@ OUT=ROOT/"draft_review.csv"
 REPORT=ROOT/"draft_review.md"
 INBOX=ROOT/"draft_inbox.html"
 MAX_DRAFTS=min(max(int(os.getenv("SCOUT_MAX_DRAFTS","5")),0),10)
+AGENT_NAME="John Laering"
+AGENT_ROLE="Virtual Client Relations Agent"
+AGENT_CONTACT=os.getenv("SCOUT_BUSINESS_CONTACT") or "cairnflowprivate@gmail.com"
 class Contacts(HTMLParser):
     def __init__(self):
         super().__init__(); self.emails=[]; self.links=[]; self.phones=[]; self.forms=0; self.form_fields=set(); self.text_emails=[]
