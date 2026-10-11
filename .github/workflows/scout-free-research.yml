@@ -1,0 +1,35 @@
+name: Scout Free Research (review only)
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '15 14 * * 1-5'
+permissions:
+  contents: read
+concurrency:
+  group: scout-free-research
+  cancel-in-progress: false
+jobs:
+  research:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Discover candidate businesses using free public data
+        run: python operations/scout_free_research.py
+      - name: Prepare five offline review drafts
+        run: python operations/scout_outreach_review.py
+      - name: Upload research evidence (no outreach)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scout-free-research-review
+          path: |
+            operations/prospects.csv
+            operations/prospect_report.md
+            operations/outreach_review.csv
+            operations/outreach_report.md
+          if-no-files-found: warn
+          retention-days: 7
