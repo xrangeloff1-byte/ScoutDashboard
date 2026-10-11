@@ -16,14 +16,15 @@ OUT = ROOT / "prospects.csv"
 REPORT = ROOT / "prospect_report.md"
 FIELDS = ["business","website","domain","source_query","public_evidence","potential_service","verification","contact_email","outreach_status","review_status"]
 BLOCKED = {"facebook.com","instagram.com","yelp.com","angi.com","bbb.org","yellowpages.com","linkedin.com","mapquest.com","homeadvisor.com","houzz.com","thumbtack.com"}
-# Small, bounded query for Omaha/Lincoln-area service businesses.
+# Bounded, sequential geographic expansion; stop once enough website-bearing businesses are found.
 OVERPASS_ENDPOINTS = ("https://overpass.kumi.systems/api/interpreter", "https://overpass-api.de/api/interpreter", "https://overpass.nchc.org.tw/api/interpreter")
-QUERY = """[out:json][timeout:15];
-(
- node["craft"~"^(roofer|plumber|hvac|carpenter|builder|landscaper|electrician)$"](around:10000,41.2565,-95.9345);
- node["craft"~"^(roofer|plumber|hvac|carpenter|builder|landscaper|electrician)$"](around:7000,40.8136,-96.7026);
-);
-out tags 60;"""
+CENTERS = ((41.2565,-95.9345), (40.8136,-96.7026)) # Omaha and Lincoln; configurable later
+RADII_METERS = (10000, 25000, 50000, 100000)
+MIN_RESULTS = 8
+def query_for_radius(radius):
+    clauses = "\n".join(' node["craft"~"^(roofer|plumber|hvac|carpenter|builder|landscaper|electrician)$"](around:%d,%s,%s);' % (radius,lat,lon) for lat,lon in CENTERS)
+    return "[out:json][timeout:15];\n(\n"+clauses+"\n);\nout tags 80;"
+
 
 def normalize_website(raw):
     raw = (raw or "").strip()
@@ -38,34 +39,42 @@ def normalize_website(raw):
     return "https://" + host + "/", host
 
 def discover():
-    data = urllib.parse.urlencode({"data": QUERY}).encode()
-    payload = None
+    found = {}
     failures = []
-    for endpoint in OVERPASS_ENDPOINTS:
-        req = urllib.request.Request(endpoint, data=data, headers={
-            "User-Agent": "ScoutDashboardResearch/1.0 (review-only; GitHub Actions)",
-            "Accept": "application/json"}, method="POST")
-        try:
-            with urllib.request.urlopen(req, timeout=22) as response:
-                payload = json.load(response)
-            break
-        except (OSError, ValueError, urllib.error.URLError, json.JSONDecodeError) as exc:
-            failures.append(endpoint + ": " + type(exc).__name__ + " " + str(exc)[:120])
-    if payload is None:
-        raise RuntimeError("All free Overpass endpoints failed: " + "; ".join(failures))
-    for item in payload.get("elements", []):
-        tags = item.get("tags") or {}
-        name = (tags.get("name") or "").strip()
-        website = normalize_website(tags.get("website") or tags.get("contact:website"))
-        if not name or not website: continue
-        url, host = website
-        yield {"business":name[:140], "website":url, "domain":host,
-               "source_query":"OpenStreetMap public business listing",
-               "public_evidence":"OSM object "+str(item.get("type",""))+"/"+str(item.get("id",""))+
-                                 "; craft="+str(tags.get("craft",""))[:40],
-               "potential_service":"Website and inquiry-path review",
-               "verification":"UNVERIFIED - verify business and website independently",
-               "contact_email":"", "outreach_status":"RESEARCH_ONLY", "review_status":"PENDING"}
+    for radius in RADII_METERS:
+        payload = None
+        data = urllib.parse.urlencode({"data":query_for_radius(radius)}).encode()
+        for endpoint in OVERPASS_ENDPOINTS:
+            req = urllib.request.Request(endpoint, data=data, headers={
+                "User-Agent":"ScoutDashboardResearch/1.0 (review-only; GitHub Actions)",
+                "Accept":"application/json"}, method="POST")
+            try:
+                with urllib.request.urlopen(req, timeout=22) as response:
+                    payload = json.load(response)
+                break
+            except (OSError, ValueError, urllib.error.URLError, json.JSONDecodeError) as exc:
+                failures.append(endpoint+": "+type(exc).__name__+" "+str(exc)[:100])
+        if payload is None:
+            continue
+        for item in payload.get("elements", []):
+            tags = item.get("tags") or {}
+            name = (tags.get("name") or "").strip()
+            website = normalize_website(tags.get("website") or tags.get("contact:website"))
+            if not name or not website: continue
+            url, host = website
+            if host not in found:
+                found[host] = {"business":name[:140],"website":url,"domain":host,
+                    "source_query":"OpenStreetMap public business listing; search radius "+str(radius//1000)+" km",
+                    "public_evidence":"OSM object "+str(item.get("type",""))+"/"+str(item.get("id",""))+
+                    "; craft="+str(tags.get("craft",""))[:40],
+                    "potential_service":"Evidence-backed website review",
+                    "verification":"UNVERIFIED - verify business and website independently",
+                    "contact_email":"","outreach_status":"RESEARCH_ONLY","review_status":"PENDING"}
+        print("Scout radius "+str(radius//1000)+" km: "+str(len(found))+" unique businesses")
+        if len(found)>=MIN_RESULTS: break
+    if not found and failures:
+        raise RuntimeError("Public Overpass search returned no businesses; errors: "+"; ".join(failures[:3]))
+    yield from found.values()
 
 def main():
     existing = {}

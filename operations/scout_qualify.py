@@ -9,7 +9,7 @@ import html
 import ipaddress
 import pathlib
 import re
-import socket
+import socket\nimport json
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -30,14 +30,14 @@ class PageParser(HTMLParser):
         self.description = False
         self.form = False
         self.h1 = False
-        self.contact = False
+        self.contact = False\n        self.images_missing_alt = 0\n        self.images_seen = 0
     def handle_starttag(self, tag, attrs):
         a = dict(attrs)
         if tag == "title": self.in_title = True
         if tag == "meta":
             if a.get("name", "").lower() == "viewport": self.viewport = True
             if a.get("name", "").lower() == "description": self.description = bool(a.get("content", "").strip())
-        if tag == "form": self.form = True
+        if tag == "form": self.form = True\n        if tag == "img":\n            self.images_seen += 1\n            if "alt" not in a: self.images_missing_alt += 1
         if tag == "h1": self.h1 = True
         if tag == "a" and any(x in (a.get("href", "") + " " + a.get("aria-label", "")).lower() for x in ("contact", "tel:", "mailto:", "quote", "estimate")):
             self.contact = True
@@ -79,22 +79,28 @@ def inspect(url):
             raw = res.read(250_000)
             parser = PageParser()
             parser.feed(raw.decode("utf-8", errors="replace"))
-            return "FETCHED", parser, "Public homepage HTML inspected"
+            parser.response_headers = dict(res.headers.items())\n            return "FETCHED", parser, "Public homepage HTML inspected"
     except urllib.error.HTTPError as e:
         return "HTTP_" + str(e.code), None, "Homepage fetch did not return HTML; no defect inferred"
     except Exception as e:
         return "UNAVAILABLE", None, "Fetch failed (" + type(e).__name__ + "); no defect inferred"
 
 def choose_offer(parser):
-    if not parser: return "General website review", "No specific website issue verified", 0
-    # Absence in HTML is a preliminary signal only: scripts can add features dynamically.
+    if not parser: return "Website review", "No website problem verified", 0
+    # Findings describe observable responses, not confirmed security vulnerabilities.
     signals = []
-    if not parser.viewport: signals.append("Viewport meta tag not observed in fetched HTML")
-    if not parser.description: signals.append("Meta description not observed in fetched HTML")
-    if not parser.h1: signals.append("H1 heading not observed in fetched HTML")
-    if not signals:
-        return "Website conversion review", "No obvious metadata gaps in fetched HTML", 20
-    return "Website metadata and mobile review", "; ".join(signals), min(60, 25 + 12 * len(signals))
+    if not parser.viewport: signals.append("Homepage HTML lacks a viewport meta tag")
+    if not parser.description: signals.append("Homepage HTML lacks a meta description")
+    if not parser.h1: signals.append("Homepage HTML lacks an H1 heading")
+    if parser.images_missing_alt:
+        signals.append(str(parser.images_missing_alt)+" of "+str(parser.images_seen)+" homepage images lack alt attributes")
+    headers = {k.lower():v for k,v in getattr(parser,"response_headers",{}).items()}
+    if "content-security-policy" not in headers:
+        signals.append("Homepage HTTP response lacks a Content-Security-Policy header (configuration review suggested)")
+    if "x-content-type-options" not in headers:
+        signals.append("Homepage HTTP response lacks an X-Content-Type-Options header")
+    if not signals: return "Website review", "No targeted gaps observed in fetched homepage", 0
+    return "Website accessibility, metadata and security-header review", "; ".join(signals), min(60, 20+8*len(signals))
 
 def draft(row):
     business = row["business"].strip() or row["domain"]
@@ -158,7 +164,7 @@ def main():
         f"Drafts prepared: {len(top)}",
         "Emails sent: 0",
         "",
-        "Scores are heuristic, not verified defects. Confirm using browser and client permission before claiming an issue.",
+        "Findings are verified observations from the fetched HTML/HTTP response, not proof of defects or exploitable vulnerabilities. Browser and human review required.",\n        "Passive GET-only inspection: no exploitation, scanning, login attempts, or penetration testing.",
         "No contacts were harvested and no email was sent."
     ]) + "\n", encoding="utf-8")
     print(f"Scout qualified {len(results)} candidates, inspected {sum(x['inspection_status']=='FETCHED' for x in results)} pages, prepared {len(top)} unsent drafts")
